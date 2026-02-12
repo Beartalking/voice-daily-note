@@ -1,0 +1,18 @@
+# Audio files (large, not tracked)
+Recording/*.wav
+Recording/*.m4a
+Recording/*.mp3
+archive/
+
+# Intermediate products (regenerable)
+transcripts/
+
+# Environment / secrets
+.env
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
