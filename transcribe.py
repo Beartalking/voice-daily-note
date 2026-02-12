@@ -12,6 +12,7 @@ from typing import Optional, List, Tuple
 from config import (
     AUDIO_EXTENSIONS,
     BUZZ_CLI,
+    BUZZ_TIMEOUT,
     RECORDING_DIR,
     TRANSCRIBE_LANGUAGE,
     TRANSCRIPTS_DIR,
@@ -101,17 +102,22 @@ def _transcribe_buzz(audio_path: Path) -> bool:
     ]
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=600
+            cmd, capture_output=True, text=True, timeout=BUZZ_TIMEOUT
         )
         if result.returncode == 0:
-            return True
+            # Verify the output file was actually created
+            expected = TRANSCRIPTS_DIR / f"{audio_path.stem}.txt"
+            if expected.exists() and expected.stat().st_size > 0:
+                return True
+            print(f"    Buzz CLI exited OK but no output file found")
+            return False
         print(f"    Buzz CLI error (code {result.returncode}): {result.stderr[:200]}")
         return False
     except FileNotFoundError:
         print("    Buzz CLI not found at expected path")
         return False
     except subprocess.TimeoutExpired:
-        print("    Buzz CLI timed out (10 min)")
+        print(f"    Buzz CLI timed out ({BUZZ_TIMEOUT // 60} min)")
         return False
 
 

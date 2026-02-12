@@ -7,6 +7,9 @@ archive/
 # Intermediate products (regenerable)
 transcripts/
 
+# Runtime logs
+logs/
+
 # Environment / secrets
 .env
 

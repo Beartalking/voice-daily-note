@@ -18,6 +18,7 @@ BUZZ_CLI = "/Applications/Buzz.app/Contents/MacOS/Buzz"
 WHISPER_MODEL_SIZE = "medium"
 TRANSCRIBE_LANGUAGE = "zh"
 AUDIO_EXTENSIONS = {".wav", ".m4a", ".mp3"}
+BUZZ_TIMEOUT = 1800  # 30 minutes per file (Buzz is faster than whisper)
 
 # ── Claude API ───────────────────────────────────────────────────────
 CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
