@@ -22,13 +22,13 @@ Recording/*.wav  →  transcripts/*.txt  →  output/YYYY-MM-DD.md
 ### v1.1 — Share-to-LinkedIn Pipeline / LinkedIn 分享流水线
 
 ```
-sharing_input/*.md  →  01_extracted.md  →  02_refined.md  →  03_linkedin.md
-  (daily notes)        (#Share entries)    (polished)        (bilingual posts)
+sharing_input/*.md  →  01_extracted.md  →  02_twitter.md   →  03_linkedin.md
+  (daily notes)        (#Share entries)    (推特可发中文)      (LinkedIn 中英双语)
 ```
 
 1. **Extract** — Scans daily notes for `#Share` tagged entries, strips metadata
-2. **Refine** — Polishes content for social media readability via Claude API
-3. **LinkedIn** — Filters by professional relevance, generates bilingual (中/EN) posts
+2. **Twitter** — Polishes into Twitter-ready Chinese posts via Claude API
+3. **LinkedIn** — Filters by professional relevance, translates to bilingual (中/EN) posts
 
 ---
 
@@ -79,7 +79,7 @@ python3 share_to_linkedin.py --dry-run
 
 # Run individual steps / 运行单个步骤
 python3 share_to_linkedin.py --step extract     # Extract only / 仅提取
-python3 share_to_linkedin.py --step refine      # Extract + refine / 提取+润色
+python3 share_to_linkedin.py --step twitter     # Extract + Twitter / 提取+推特润色
 
 # Custom input directory / 自定义输入目录
 python3 share_to_linkedin.py --input-dir ./output
@@ -102,7 +102,7 @@ python3 share_to_linkedin.py --input-dir ./output
 |------|-------------------|
 | `--dry-run` | Preview extracted entries, skip API / 预览提取结果，不调 API |
 | `--step extract` | Extract #Share entries only / 仅提取 |
-| `--step refine` | Extract + refine / 提取+润色 |
+| `--step twitter` | Extract + Twitter polish / 提取+推特润色 |
 | `--step linkedin` | All 3 steps (default) / 全部三步（默认） |
 | `--input-dir PATH` | Custom input directory / 自定义输入目录 |
 
@@ -150,7 +150,7 @@ voice-daily-note/
 ├── sharing_input/          # Input: daily notes for LinkedIn / LinkedIn 输入
 ├── sharing_output/         # Output: LinkedIn bilingual posts / LinkedIn 输出
 │   ├── 01_extracted.md     #   Raw #Share entries / 提取的 #Share 条目
-│   ├── 02_refined.md       #   Polished for social media / 社交媒体润色版
+│   ├── 02_twitter.md       #   Twitter-ready Chinese / 推特可发中文版
 │   └── 03_linkedin.md      #   Final bilingual posts / 最终中英双语帖子
 │
 ├── pipeline.py             # v1.0 main entry / 主入口

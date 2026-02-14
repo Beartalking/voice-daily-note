@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Share-to-LinkedIn pipeline: extract #Share entries, refine, and generate bilingual posts."""
+"""Share pipeline: extract #Share entries → Twitter-ready Chinese → LinkedIn bilingual posts."""
 from __future__ import annotations
 
 import argparse
@@ -200,10 +200,10 @@ def write_extracted(entries: list[ShareEntry], output_dir: Path) -> Path:
     return out_path
 
 
-# ── Step 2: Refine for Social Media ─────────────────────────────────
+# ── Step 2: Twitter-ready Chinese Posts ──────────────────────────────
 
-REFINE_SYSTEM_PROMPT = """\
-你是一位社交媒体内容编辑。你的任务是对用户提供的语音笔记内容进行书面润色，使其更适合在社交媒体上发布。
+TWITTER_SYSTEM_PROMPT = """\
+你是一位社交媒体内容编辑。你的任务是对用户提供的语音笔记内容进行书面润色，使其可以直接在推特（X）上用中文发布。
 
 ## 润色原则
 
@@ -212,29 +212,31 @@ REFINE_SYSTEM_PROMPT = """\
 - **提升流畅度**：让口语化的表达更符合书面阅读习惯，但不要过度正式化。
 - **保留细节**：不删除具体的数字、案例或个人经历，这些是内容的灵魂。
 - **自然段落**：根据语义自然分段，提升可读性。
+- **适合推特**：语气自然、有观点、有个性，适合社交媒体上的公开分享。
 
 ## 输出格式
 
 对每一条输入条目，保持 `## 标题` 格式，直接输出润色后的内容。
 标题可以微调使其更吸引人，但不要偏离原意。
+不同条目之间用 `===` 分隔。
 不要添加任何解释、前言或总结。\
 """
 
 
-def refine_for_social_media(api_key: str, output_dir: Path) -> Path:
-    """Read 01_extracted.md, refine via Claude API, write 02_refined.md."""
+def refine_for_twitter(api_key: str, output_dir: Path) -> Path:
+    """Read 01_extracted.md, refine via Claude API, write 02_twitter.md."""
     extracted_path = output_dir / "01_extracted.md"
     if not extracted_path.exists():
         raise SystemExit("ERROR: 01_extracted.md not found. Run extract step first.")
 
     user_message = extracted_path.read_text(encoding="utf-8")
-    print("  Calling Claude API for social media refinement...")
-    refined = _call_claude(api_key, REFINE_SYSTEM_PROMPT, user_message)
+    print("  Calling Claude API for Twitter refinement...")
+    refined = _call_claude(api_key, TWITTER_SYSTEM_PROMPT, user_message)
 
     if not refined:
         raise SystemExit("ERROR: Claude API returned empty response for refinement.")
 
-    out_path = output_dir / "02_refined.md"
+    out_path = output_dir / "02_twitter.md"
     out_path.write_text(refined, encoding="utf-8")
     return out_path
 
@@ -294,10 +296,10 @@ English version...
 
 
 def prepare_linkedin_posts(api_key: str, output_dir: Path) -> Path:
-    """Read 02_refined.md, filter + translate via Claude API, write 03_linkedin.md."""
-    refined_path = output_dir / "02_refined.md"
+    """Read 02_twitter.md, filter + translate via Claude API, write 03_linkedin.md."""
+    refined_path = output_dir / "02_twitter.md"
     if not refined_path.exists():
-        raise SystemExit("ERROR: 02_refined.md not found. Run refine step first.")
+        raise SystemExit("ERROR: 02_twitter.md not found. Run twitter step first.")
 
     user_message = refined_path.read_text(encoding="utf-8")
     print("  Calling Claude API for LinkedIn filtering and translation...")
@@ -315,11 +317,11 @@ def prepare_linkedin_posts(api_key: str, output_dir: Path) -> Path:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Share-to-LinkedIn: extract #Share entries, refine, and generate bilingual posts"
+        description="Share pipeline: extract #Share → Twitter Chinese → LinkedIn bilingual"
     )
     parser.add_argument(
         "--step",
-        choices=["extract", "refine", "linkedin"],
+        choices=["extract", "twitter", "linkedin"],
         default=None,
         help="Run up to a specific step (default: run all 3 steps)",
     )
@@ -365,14 +367,14 @@ def main():
         print("Done (extract only).")
         return
 
-    # Step 2: Refine
+    # Step 2: Twitter
     api_key = get_api_key()
-    print("\nStep 2: Refining for social media...")
-    out = refine_for_social_media(api_key, output_dir)
-    print(f"  -> {out}")
+    print("\nStep 2: Refining for Twitter (Chinese)...")
+    out = refine_for_twitter(api_key, output_dir)
+    print(f"  -> {out}  (可直接用于推特发布)")
 
-    if args.step == "refine":
-        print("Done (extract + refine).")
+    if args.step == "twitter":
+        print("Done (extract + twitter).")
         return
 
     # Step 3: LinkedIn
