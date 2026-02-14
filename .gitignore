@@ -10,6 +10,10 @@ transcripts/
 # Runtime logs
 logs/
 
+# Sharing pipeline (input/output)
+sharing_input/
+sharing_output/
+
 # Environment / secrets
 .env
 

@@ -6,12 +6,19 @@ import argparse
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # ── Directory Structure ──────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent
+
+# Load .env file from project root
+load_dotenv(BASE_DIR / ".env")
 RECORDING_DIR = BASE_DIR / "Recording"
 TRANSCRIPTS_DIR = BASE_DIR / "transcripts"
 OUTPUT_DIR = BASE_DIR / "output"
 ARCHIVE_DIR = BASE_DIR / "archive"
+SHARING_INPUT_DIR = BASE_DIR / "sharing_input"
+SHARING_OUTPUT_DIR = BASE_DIR / "sharing_output"
 
 # ── Transcription ────────────────────────────────────────────────────
 BUZZ_CLI = "/Applications/Buzz.app/Contents/MacOS/Buzz"
