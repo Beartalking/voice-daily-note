@@ -74,7 +74,7 @@ def _parse_entries_from_file(filepath: Path) -> list[ShareEntry]:
         # Check for #Share tag — handle both formats:
         # Format 1 (pipe-separated): **场景**：... | **标签**：#Share | **记录时间**：...
         # Format 2 (multi-line):     **标签**：#Share
-        if not re.search(r"\*\*标签\*\*[：:]\s*#Share", entry_text):
+        if not re.search(r"\*\*标签\*\*[：:].*#Share", entry_text):
             continue
 
         # Extract title
