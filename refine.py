@@ -72,11 +72,26 @@ def group_transcripts_by_date() -> dict[str, list[tuple[str, str]]]:
     return result
 
 
+def _detect_language(text: str) -> str:
+    """Return 'ENGLISH' if text is primarily in English, else 'CHINESE'."""
+    stripped = text.strip()
+    if not stripped:
+        return "CHINESE"
+    # Count ASCII letters (English) vs CJK characters (Chinese)
+    ascii_letters = sum(1 for c in stripped if c.isascii() and c.isalpha())
+    cjk_chars = sum(1 for c in stripped if '\u4e00' <= c <= '\u9fff')
+    total = ascii_letters + cjk_chars
+    if total == 0:
+        return "CHINESE"
+    return "ENGLISH" if ascii_letters / total > 0.5 else "CHINESE"
+
+
 def _build_user_message(date: str, entries: list[tuple[str, str]]) -> str:
     """Build the user message for a single day's transcripts."""
     parts = [f"# {date}\n"]
     for time_str, content in entries:
-        parts.append(f"## {time_str}\n")
+        lang = _detect_language(content)
+        parts.append(f"## {time_str} [{lang}]\n")
         parts.append(content.strip())
         parts.append("")  # blank line between entries
     return "\n".join(parts)

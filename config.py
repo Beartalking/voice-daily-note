@@ -19,11 +19,14 @@ OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", str(BASE_DIR / "output")))
 ARCHIVE_DIR = BASE_DIR / "archive"
 SHARING_INPUT_DIR = BASE_DIR / "sharing_input"
 SHARING_OUTPUT_DIR = BASE_DIR / "sharing_output"
+VAULT_SHARED_POSTS_DIR = Path(
+    "/Users/bearliu/Library/Mobile Documents/iCloud~md~obsidian/Documents/Bear Vault/Shared posts"
+)
 
 # ── Transcription ────────────────────────────────────────────────────
 BUZZ_CLI = "/Applications/Buzz.app/Contents/MacOS/Buzz"
 WHISPER_MODEL_SIZE = "medium"
-TRANSCRIBE_LANGUAGE = "zh"
+TRANSCRIBE_LANGUAGE = None  # Auto-detect: handles mixed Chinese/English recordings
 AUDIO_EXTENSIONS = {".wav", ".m4a", ".mp3"}
 BUZZ_TIMEOUT = 120  # 2 minutes per file; falls back to Whisper on timeout
 
