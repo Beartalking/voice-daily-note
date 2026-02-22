@@ -19,16 +19,16 @@ Recording/*.wav  →  transcripts/*.txt  →  output/YYYY-MM-DD.md
 2. **Refine** — Sends transcripts to Claude API for editing: fix typos, add paragraphs, add structure. Zero content deletion.
 3. **Archive** — Moves processed audio to `archive/YYYY-MM-DD/`
 
-### v1.1 — Share-to-LinkedIn Pipeline / LinkedIn 分享流水线
+### v1.1 — Share Pipeline / 分享流水线
 
 ```
-sharing_input/*.md  →  01_extracted.md  →  02_twitter.md   →  03_linkedin.md
-  (daily notes)        (#Share entries)    (推特可发中文)      (LinkedIn 中英双语)
+Daily notes/*.md  →  01_extracted.md  →  02_twitter.md  →  Obsidian Shared posts/
+  (Obsidian vault)    (#Share entries)    (润色后中文)        (按周归档)
 ```
 
 1. **Extract** — Scans daily notes for `#Share` tagged entries, strips metadata
-2. **Twitter** — Polishes into Twitter-ready Chinese posts via Claude API
-3. **LinkedIn** — Filters by professional relevance, translates to bilingual (中/EN) posts
+2. **Refine** — Polishes into Twitter-ready posts via Claude API
+3. **Merge** — Writes refined entries into weekly files in Obsidian Shared posts (idempotent)
 
 ---
 
@@ -62,28 +62,25 @@ python3 pipeline.py --dry-run
 ./run-overnight.sh
 ```
 
-### Share to LinkedIn / 分享到 LinkedIn
+### Share Pipeline / 分享流水线
 
 ```bash
-# Copy daily notes with #Share entries into sharing_input/
-# 将含有 #Share 标签的日记复制到 sharing_input/
-cp output/2026-02-11.md sharing_input/
-
-# Full pipeline (extract → refine → LinkedIn bilingual posts)
-# 完整流水线（提取 → 润色 → LinkedIn 中英双语帖子）
-python3 share_to_linkedin.py
+# Full pipeline: extract #Share entries → refine → sync to Obsidian Shared posts
+# 完整流水线：提取 #Share 条目 → 润色 → 同步到 Obsidian Shared posts
+python3 share_pipeline.py --input-dir "$OUTPUT_DIR"
 
 # Preview extracted entries without calling API
 # 预览提取结果，不调用 API
-python3 share_to_linkedin.py --dry-run
+python3 share_pipeline.py --dry-run
 
 # Run individual steps / 运行单个步骤
-python3 share_to_linkedin.py --step extract     # Extract only / 仅提取
-python3 share_to_linkedin.py --step twitter     # Extract + Twitter / 提取+推特润色
-
-# Custom input directory / 自定义输入目录
-python3 share_to_linkedin.py --input-dir ./output
+python3 share_pipeline.py --step extract   # Extract only / 仅提取
+python3 share_pipeline.py --step refine    # Extract + refine / 提取+润色
 ```
+
+`OUTPUT_DIR` is set in `.env` and points to your Obsidian Daily notes folder.
+
+`OUTPUT_DIR` 在 `.env` 中设置，指向你的 Obsidian Daily notes 文件夹。
 
 ### All Options — pipeline.py / 所有选项
 
@@ -96,14 +93,13 @@ python3 share_to_linkedin.py --input-dir ./output
 | `--engine whisper` | Use whisper instead of Buzz / 使用 whisper 代替 Buzz |
 | `--no-archive` | Keep originals in Recording/ / 不归档原始音频 |
 
-### All Options — share_to_linkedin.py / 所有选项
+### All Options — share_pipeline.py / 所有选项
 
 | Flag | Description / 说明 |
 |------|-------------------|
 | `--dry-run` | Preview extracted entries, skip API / 预览提取结果，不调 API |
 | `--step extract` | Extract #Share entries only / 仅提取 |
-| `--step twitter` | Extract + Twitter polish / 提取+推特润色 |
-| `--step linkedin` | All 3 steps (default) / 全部三步（默认） |
+| `--step refine` | Extract + refine / 提取+润色 |
 | `--input-dir PATH` | Custom input directory / 自定义输入目录 |
 
 ---
@@ -146,22 +142,20 @@ voice-daily-note/
 ├── transcripts/            # Intermediate: raw transcriptions / 中间产物：原始转录
 ├── output/                 # Output: refined daily notes / 输出：精修后的每日笔记
 ├── archive/                # Archive: processed audio / 归档：已处理的音频
+├── logs/                   # Pipeline logs / 流水线日志
 │
-├── sharing_input/          # Input: daily notes for LinkedIn / LinkedIn 输入
-├── sharing_output/         # Output: LinkedIn bilingual posts / LinkedIn 输出
+├── sharing_output/         # Intermediate share pipeline output / 分享流水线中间产物
 │   ├── 01_extracted.md     #   Raw #Share entries / 提取的 #Share 条目
-│   ├── 02_twitter.md       #   Twitter-ready Chinese / 推特可发中文版
-│   └── 03_linkedin.md      #   Final bilingual posts / 最终中英双语帖子
+│   └── 02_twitter.md       #   Refined posts / 润色后帖子
 │
 ├── pipeline.py             # v1.0 main entry / 主入口
 ├── transcribe.py           # v1.0 Step 1: audio → text / 音频转文字
 ├── refine.py               # v1.0 Step 2: text → polished MD / 文字转精修 MD
 ├── refinement_prompt.py    # v1.0 LLM system prompt / LLM 系统提示词
-├── share_to_linkedin.py    # v1.1 Share-to-LinkedIn pipeline / LinkedIn 分享流水线
+├── share_pipeline.py       # v1.1 Share pipeline → Obsidian Shared posts
 ├── config.py               # Shared configuration / 共享配置
 ├── .env                    # API keys (gitignored) / API 密钥（不提交）
-├── run-overnight.sh        # Background runner / 后台运行脚本
-└── plan.md                 # Project roadmap / 项目路线图
+└── run-overnight.sh        # Background runner / 后台运行脚本
 ```
 
 ---
@@ -188,4 +182,4 @@ voice-daily-note/
 | Version | Description |
 |---------|-------------|
 | **v1.0** | Daily note pipeline: audio → transcript → polished Markdown, grouped by date |
-| **v1.1** | Share-to-LinkedIn pipeline: extract #Share entries → refine → bilingual LinkedIn posts |
+| **v1.1** | Share pipeline: extract #Share entries → refine → sync to Obsidian Shared posts |
