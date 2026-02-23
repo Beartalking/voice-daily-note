@@ -1,123 +1,99 @@
 # Voice Daily Note
 
-One command to turn voice memos into polished daily Markdown notes — and share them on LinkedIn.
-
-一条命令，将语音备忘录转化为精修的每日 Markdown 笔记，并一键生成 LinkedIn 双语帖子。
+一条命令，将录音笔的语音备忘录转化为精修的每日 Markdown 笔记，并自动生成适合三个平台发布的社交帖子。
 
 ---
 
-## How It Works / 工作原理
+## 工作流程
 
-### v1.0 — Daily Note Pipeline / 每日笔记流水线
-
-```
-Recording/*.wav  →  transcripts/*.txt  →  output/YYYY-MM-DD.md
-   (audio)          (Buzz/Whisper)         (Claude API refinement)
-```
-
-1. **Transcribe** — Converts audio to text using [Buzz](https://buzzcaptions.com/) (primary) or OpenAI Whisper (fallback)
-2. **Refine** — Sends transcripts to Claude API for editing: fix typos, add paragraphs, add structure. Zero content deletion.
-3. **Archive** — Moves processed audio to `archive/YYYY-MM-DD/`
-
-### v1.1 — Share Pipeline / 分享流水线
+### v1.0 — 每日笔记流水线
 
 ```
-Daily notes/*.md  →  01_extracted.md  →  02_twitter.md  →  Obsidian Shared posts/
-  (Obsidian vault)    (#Share entries)    (润色后中文)        (按周归档)
+Recording/*.wav  →  transcripts/*.txt  →  output/YYYY-MM-DD.md  →  Obsidian Daily Notes
+   (录音文件)          (Buzz/Whisper)         (Claude API 精修)
 ```
 
-1. **Extract** — Scans daily notes for `#Share` tagged entries, strips metadata
-2. **Refine** — Polishes into Twitter-ready posts via Claude API
-3. **Merge** — Writes refined entries into weekly files in Obsidian Shared posts (idempotent)
+1. **转写**：用 [Buzz](https://buzzcaptions.com/) 调用本地 Whisper 模型转文字，失败时自动 fallback 到 Python whisper 库
+2. **精修**：发送转写文本给 Claude API，修正错别字、补充分段、整理结构。零删减，原始信息全量保留
+3. **归档**：精修完成后将音频移入 `archive/YYYY-MM-DD/`
+
+### v1.3 — 社交帖子流水线
+
+```
+Daily Notes/*.md  →  01_extracted.md  →  02_social.md  →  Bear Content Vault
+  (Obsidian vault)    (#Share 条目)       (三平台版本)       manual/YYYY-MM/
+```
+
+1. **提取**：扫描每日笔记，提取打了 `#Share` 标签的条目
+2. **生成**：一次 Claude API 调用，同时生成三个平台版本：
+   - `---twitter-cn---`：完整中文内容，不限字数
+   - `---linkedin-en---`：英文，LinkedIn 调性
+   - `---youtube-shorts---`：标题 + hashtags
+3. **存档**：每条帖子单独存为 `YYYY-MM-DD-标题.md`，写入 Bear Content Vault
 
 ---
 
-## Quick Start / 快速开始
+## 快速开始
 
-### Setup / 配置
+### 配置
 
 ```bash
-# Set your API key (one-time)
-# 设置 API 密钥（一次性）
-echo "export ANTHROPIC_API_KEY='sk-ant-...'" >> ~/.zshrc
-source ~/.zshrc
+# 在 .env 文件里设置（复制 .env.example）
+ANTHROPIC_API_KEY=sk-ant-...
+OUTPUT_DIR=/path/to/Obsidian/Daily notes   # 输出到 Obsidian vault
 ```
 
-### Usage / 使用
+### 每日笔记
 
 ```bash
-# Drop audio files into Recording/, then:
-# 将音频文件放入 Recording/，然后：
-
-cd voice-daily-note
-
-# Full pipeline / 完整流水线
+# 把音频文件放入 Recording/，然后：
 python3 pipeline.py
 
-# Preview only / 仅预览
+# 仅预览，不处理
 python3 pipeline.py --dry-run
 
-# Run overnight (prevents Mac sleep, sends notification when done)
-# 夜间运行（阻止 Mac 休眠，完成后发送通知）
+# 夜间批量运行（防止 Mac 休眠，完成后发通知）
 ./run-overnight.sh
 ```
 
-### Share Pipeline / 分享流水线
+| 参数 | 说明 |
+|------|------|
+| `--dry-run` | 预览模式，不实际处理 |
+| `--step transcribe` | 仅转写 |
+| `--step refine` | 仅精修 |
+| `--force` | 强制重新处理已有文件 |
+| `--engine whisper` | 跳过 Buzz，直接用 whisper |
+| `--no-archive` | 不归档原始音频 |
+
+### 社交帖子
 
 ```bash
-# Full pipeline: extract #Share entries → refine → sync to Obsidian Shared posts
-# 完整流水线：提取 #Share 条目 → 润色 → 同步到 Obsidian Shared posts
-python3 share_pipeline.py --input-dir "$OUTPUT_DIR"
+# 把要处理的每日笔记放入 sharing_input/，然后：
+python3 share_to_social.py
 
-# Preview extracted entries without calling API
-# 预览提取结果，不调用 API
-python3 share_pipeline.py --dry-run
+# 仅预览提取结果
+python3 share_to_social.py --dry-run
 
-# Run individual steps / 运行单个步骤
-python3 share_pipeline.py --step extract   # Extract only / 仅提取
-python3 share_pipeline.py --step refine    # Extract + refine / 提取+润色
+# 指定输入目录
+python3 share_to_social.py --input-dir /path/to/notes
+
+# 分步运行
+python3 share_to_social.py --step extract    # 仅提取
+python3 share_to_social.py --step generate   # 提取 + 生成（不存 vault）
 ```
 
-`OUTPUT_DIR` is set in `.env` and points to your Obsidian Daily notes folder.
+---
 
-`OUTPUT_DIR` 在 `.env` 中设置，指向你的 Obsidian Daily notes 文件夹。
+## 支持的音频格式
 
-### All Options — pipeline.py / 所有选项
-
-| Flag | Description / 说明 |
-|------|-------------------|
-| `--dry-run` | Preview without processing / 预览模式，不实际处理 |
-| `--step transcribe` | Transcribe only / 仅转录 |
-| `--step refine` | Refine only / 仅精修 |
-| `--force` | Re-process all files / 强制重新处理所有文件 |
-| `--engine whisper` | Use whisper instead of Buzz / 使用 whisper 代替 Buzz |
-| `--no-archive` | Keep originals in Recording/ / 不归档原始音频 |
-
-### All Options — share_pipeline.py / 所有选项
-
-| Flag | Description / 说明 |
-|------|-------------------|
-| `--dry-run` | Preview extracted entries, skip API / 预览提取结果，不调 API |
-| `--step extract` | Extract #Share entries only / 仅提取 |
-| `--step refine` | Extract + refine / 提取+润色 |
-| `--input-dir PATH` | Custom input directory / 自定义输入目录 |
+| 来源 | 文件名示例 | 提取到的时间 |
+|------|-----------|------------|
+| 录音笔 | `TX00_MIC031_20260212_175200_orig.wav` | `2026-02-12 17:52:00` |
+| iPhone 语音备忘录 | `20260212-1.m4a` | `2026-02-12` |
 
 ---
 
-## Supported Filename Formats / 支持的文件名格式
-
-| Source / 来源 | Example / 示例 | Date Extracted / 提取日期 |
-|--------------|---------------|------------------------|
-| Recorder / 录音笔 | `TX00_MIC031_20260212_175200_orig.wav` | `2026-02-12 17:52:00` |
-| Voice Memo / 语音备忘录 | `20260212-1.wav` | `2026-02-12` |
-
----
-
-## Output Format / 输出格式
-
-Each day produces one Markdown file with YAML front matter:
-
-每天生成一个带 YAML 头信息的 Markdown 文件：
+## 每日笔记输出格式
 
 ```markdown
 ---
@@ -129,57 +105,75 @@ entries: 3
 ## 关于设计系统的思考
 **场景**：通勤路上 | **标签**：#Work | **记录时间**：17:52:00
 ---
-[精修后的全文内容...]
+精修后的全文内容...
+```
+
+## 社交帖子输出格式
+
+```markdown
+## 帖子标题
+
+一两句话的核心摘要。
+
+---twitter-cn---
+完整中文内容...
+
+---linkedin-en---
+English LinkedIn content...
+
+---youtube-shorts---
+Title for YouTube Shorts #Hashtag1 #Hashtag2
 ```
 
 ---
 
-## Project Structure / 项目结构
+## 项目结构
 
 ```
 voice-daily-note/
-├── Recording/              # Input: drop audio files here / 输入：放入音频文件
-├── transcripts/            # Intermediate: raw transcriptions / 中间产物：原始转录
-├── output/                 # Output: refined daily notes / 输出：精修后的每日笔记
-├── archive/                # Archive: processed audio / 归档：已处理的音频
-├── logs/                   # Pipeline logs / 流水线日志
+├── Recording/              # 放入音频文件
+├── transcripts/            # 中间产物：原始转录文本
+├── archive/                # 已处理音频的归档
+├── sharing_input/          # 放入待提取 #Share 的每日笔记
+├── sharing_output/         # 中间产物：提取和生成的中间文件
+│   ├── 01_extracted.md
+│   └── 02_social.md
 │
-├── sharing_output/         # Intermediate share pipeline output / 分享流水线中间产物
-│   ├── 01_extracted.md     #   Raw #Share entries / 提取的 #Share 条目
-│   └── 02_twitter.md       #   Refined posts / 润色后帖子
-│
-├── pipeline.py             # v1.0 main entry / 主入口
-├── transcribe.py           # v1.0 Step 1: audio → text / 音频转文字
-├── refine.py               # v1.0 Step 2: text → polished MD / 文字转精修 MD
-├── refinement_prompt.py    # v1.0 LLM system prompt / LLM 系统提示词
-├── share_pipeline.py       # v1.1 Share pipeline → Obsidian Shared posts
-├── config.py               # Shared configuration / 共享配置
-├── .env                    # API keys (gitignored) / API 密钥（不提交）
-└── run-overnight.sh        # Background runner / 后台运行脚本
+├── pipeline.py             # 每日笔记主入口
+├── transcribe.py           # Step 1: 音频 → 文字
+├── refine.py               # Step 2: 文字 → 精修 MD
+├── refinement_prompt.py    # LLM 系统提示词
+├── share_to_social.py      # 社交帖子流水线
+├── share_pipeline.py       # 从每日笔记存到 Content Vault（轻量版）
+├── config.py               # 共享配置与路径
+├── .env                    # API 密钥（不提交 git）
+└── run-overnight.sh        # 后台运行脚本
 ```
 
 ---
 
-## Requirements / 依赖
+## 依赖
 
 - Python 3.9+
-- [Buzz.app](https://buzzcaptions.com/) (or `pip install openai-whisper` as fallback)
-- `requests`, `python-dotenv` Python packages
-- `ANTHROPIC_API_KEY` in `.env` or environment variable
+- [Buzz.app](https://buzzcaptions.com/)（或 `pip install openai-whisper` 作为 fallback）
+- `requests`, `python-dotenv`
+- `ANTHROPIC_API_KEY`
 
 ---
 
-## Design Principles / 设计原则
+## 设计原则
 
-- **Zero deletion / 零删减**：Refinement never summarizes or removes content. Only fixes typos, grammar, and formatting.
-- **Idempotent / 幂等**：Safe to re-run. Already-processed files are skipped unless `--force` is used.
-- **Fault tolerant / 容错**：Buzz fails → whisper fallback. API errors → exponential retry. Single file failure → continue with the rest.
+- **零删减**：精修只修格式和错别字，不压缩、不总结、不删内容
+- **幂等**：重复运行安全，已处理文件自动跳过，除非加 `--force`
+- **容错**：Buzz 失败自动切 whisper，API 超时自动重试，单文件失败不影响整批
 
 ---
 
-## Version History / 版本历史
+## 版本历史
 
-| Version | Description |
-|---------|-------------|
-| **v1.0** | Daily note pipeline: audio → transcript → polished Markdown, grouped by date |
-| **v1.1** | Share pipeline: extract #Share entries → refine → sync to Obsidian Shared posts |
+| 版本 | 内容 |
+|------|------|
+| v1.0 | 核心流水线：录音 → 转写 → 精修 Markdown，按日期归档 |
+| v1.1 | Obsidian 集成：OUTPUT_DIR 路由到 vault，双语输出支持 |
+| v1.2 | 分享流水线：#Share 标签提取，存入 Bear Content Vault |
+| v1.3 | 社交帖子生成：一次 API 调用生成 Twitter CN + LinkedIn EN + YouTube Shorts |
