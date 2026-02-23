@@ -22,6 +22,9 @@ SHARING_OUTPUT_DIR = BASE_DIR / "sharing_output"
 VAULT_SHARED_POSTS_DIR = Path(
     "/Users/bearliu/Library/Mobile Documents/iCloud~md~obsidian/Documents/Bear Vault/Shared posts"
 )
+CONTENT_VAULT_MANUAL_DIR = Path(
+    "/Users/bearliu/Library/Mobile Documents/iCloud~md~obsidian/Documents/Bear Content Vault/Social Posts/drafts/manual"
+)
 
 # ── Transcription ────────────────────────────────────────────────────
 BUZZ_CLI = "/Applications/Buzz.app/Contents/MacOS/Buzz"

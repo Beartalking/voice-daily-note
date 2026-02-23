@@ -91,23 +91,30 @@ def _transcribe_buzz(audio_path: Path) -> bool:
     """Transcribe using Buzz CLI. Returns True on success."""
     cmd = [
         BUZZ_CLI,
+        "add",
         "--task", "transcribe",
         "--model-type", "whisper",
         "--model-size", WHISPER_MODEL_SIZE,
-        "--language", TRANSCRIBE_LANGUAGE,
         "--txt",
         "--output-directory", str(TRANSCRIPTS_DIR),
         "--hide-gui",
         str(audio_path),
     ]
+    if TRANSCRIBE_LANGUAGE is not None:
+        cmd[6:6] = ["--language", TRANSCRIBE_LANGUAGE]
     try:
         result = subprocess.run(
             cmd, capture_output=True, text=True, timeout=BUZZ_TIMEOUT
         )
         if result.returncode == 0:
-            # Verify the output file was actually created
             expected = TRANSCRIPTS_DIR / f"{audio_path.stem}.txt"
             if expected.exists() and expected.stat().st_size > 0:
+                return True
+            # Buzz appends a timestamp to the filename, e.g. "stem (transcribed on ...).txt"
+            # Find it and rename to the expected name
+            matches = list(TRANSCRIPTS_DIR.glob(f"{audio_path.stem} (transcribed on *).txt"))
+            if matches:
+                matches[0].rename(expected)
                 return True
             print(f"    Buzz CLI exited OK but no output file found")
             return False
