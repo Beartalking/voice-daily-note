@@ -2,81 +2,60 @@
 
 ## Overview
 
-One-command pipeline that converts voice memos into polished daily Markdown notes. Drop WAV files, run one command, get structured notes organized by date.
+One-command pipeline that converts voice memos into polished daily Markdown notes, then generates multi-platform social posts from selected entries.
 
 ```
-Recording/*.wav → transcripts/*.txt → output/YYYY-MM-DD.md → archive/
+Recording/*.wav → transcripts/*.txt → output/YYYY-MM-DD.md → Obsidian Daily Notes
+                                                    ↓ (#Share entries)
+                              Bear Content Vault/Social Posts/drafts/manual/YYYY-MM/
+                              (Twitter CN + LinkedIn EN + YouTube Shorts per post)
 ```
 
 ---
 
 ## Completed
 
-### Phase 1: Core Pipeline ✅
-- [x] `config.py` — constants, CLI argument parsing, directory setup
-- [x] `refinement_prompt.py` — system prompt extracted from existing refinement instructions
-- [x] `transcribe.py` — Buzz CLI primary + whisper Python fallback, dual filename pattern support
-- [x] `refine.py` — date grouping, Claude API (Sonnet 4.5) with retry, YAML front matter output
-- [x] `pipeline.py` — orchestrator: transcribe → refine → archive with summary
-- [x] `.gitignore` + git repo initialized
+### Core Pipeline (v1.0)
+- `config.py` — constants, CLI argument parsing, `.env` support
+- `transcribe.py` — Buzz CLI primary + whisper Python fallback, dual filename pattern support
+- `refine.py` — date grouping, Claude API with retry, YAML front matter output
+- `pipeline.py` — orchestrator: transcribe → refine → archive with summary
+- `run-overnight.sh` — caffeinate + nohup + macOS notification + log file
+- Bilingual output: auto-detect language, preserve English + append Chinese translation
+- `--force`, `--dry-run`, `--no-archive`, `--engine` CLI flags
 
-### Phase 2: Reliability & Usability ✅
-- [x] Buzz CLI output verification (check file actually exists after exit code 0)
-- [x] Buzz timeout bumped to 30 min (was 10 min, caused false fallbacks)
-- [x] `run-overnight.sh` — caffeinate + nohup + macOS notification + log file
-- [x] First real-world test: 4 files across 3 days, all processed successfully
+### Obsidian Integration (v1.1)
+- `OUTPUT_DIR` env var routes daily notes to Obsidian vault
+- Daily notes land in Bear Vault/Daily notes/
 
----
+### Share Pipeline (v1.2)
+- `share_pipeline.py` — extract `#Share` entries from daily notes → Claude refinement → save individual posts to Bear Content Vault
+- Support for multi-tag entries (`#Diary #Share`, `#Work #Share`)
+- Per-post MD files saved to `Social Posts/drafts/manual/YYYY-MM/YYYY-MM-DD-title.md`
 
-## Future Improvements
+### Social Post Generation (v1.3)
+- `share_to_social.py` — replaces `share_to_linkedin.py`
+- Single Claude API call generates all 3 platforms per entry:
+  - Twitter CN: full-length Chinese, no character limit
+  - LinkedIn EN: English, LinkedIn-optimised tone
+  - YouTube Shorts: title + 1–3 hashtags
+- Output saves directly to Bear Content Vault manual drafts folder
+- Fixed token budget (4x input multiplier to prevent truncation)
 
-### Phase 3: Obsidian Integration
-- [ ] Auto-copy output MD files to Obsidian vault directory
-- [ ] Configurable vault path via `config.py` or `.env`
-- [ ] Optional: add Obsidian-compatible tags and links
-
-### Phase 4: Scheduling
-- [ ] macOS LaunchAgent for fully automatic nightly runs
-- [ ] Watch folder mode: auto-trigger when new files appear in `Recording/`
-
-### Phase 5: Quality
-- [ ] Post-refinement character count validation with auto-retry
-- [ ] Support for longer recordings: chunk audio before transcription
-- [ ] Side-by-side diff view of original vs refined text
-
-### Phase 6: Multi-source
-- [ ] iPhone Voice Memo `.m4a` filename pattern support (currently date-seq only)
-- [ ] Drag-and-drop web UI for non-technical use
-- [ ] Support additional LLM providers as refinement backend
+### Buzz CLI Fix
+- Fixed Buzz CLI: added missing `add` subcommand (was launching GUI and timing out)
+- Added output filename rename logic (Buzz appends timestamp; normalize to `stem.txt`)
 
 ---
 
-## Architecture
+## Backlog
 
-```
-pipeline.py          — Entry point, CLI, orchestration
-├── config.py        — All constants and argument parsing
-├── transcribe.py    — Audio → text (Buzz CLI / whisper)
-├── refine.py        — Text → polished MD (Claude API)
-└── refinement_prompt.py — System prompt for LLM refinement
+- [ ] **会议/通话录音总结**：单独的 pipeline，输入一段会议或通话录音，输出结构化摘要（议题、决策、行动项），存入 Obsidian 或 Content Vault
 
-run-overnight.sh     — Background runner with sleep prevention
-```
+- [ ] Chunk long audio before transcription (support recordings > 30 min)
 
-## Key Design Decisions
+- [ ] Post-refinement character count validation with auto-retry if content shrinks > 15%
 
-| Decision | Rationale |
-|----------|-----------|
-| Buzz CLI first, whisper fallback | Buzz is ~3x faster but sometimes produces no output |
-| `requests` instead of `anthropic` SDK | Zero new dependencies |
-| One MD per day, not per recording | Matches daily note workflow in Obsidian |
-| Archive after full success only | Prevents data loss if pipeline fails mid-run |
-| Idempotent by default | Safe to re-run; `--force` to override |
+- [ ] iPhone Voice Memo `.m4a` filename pattern support
 
-## Dependencies
-
-- Python 3.9+ (system)
-- `requests` (already installed)
-- Buzz.app 1.2.0 (already installed)
-- `openai-whisper` (already installed, fallback)
-- `ANTHROPIC_API_KEY` environment variable
+- [ ] `sharing_input/` auto-cleanup: remove processed files after successful vault save
