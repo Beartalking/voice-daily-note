@@ -348,7 +348,28 @@ def save_to_content_vault(posts: list[SocialPost], manual_dir: Path) -> list[Pat
             print(f"  [SKIP] Already exists: {file_path.name}")
             continue
 
-        lines = [f"## {post.title}", ""]
+        frontmatter = (
+            f"---\n"
+            f"title: {post.title}\n"
+            f"date: {post.source_date}\n"
+            f"platforms:\n"
+            f"  - twitter-cn\n"
+            f"  - linkedin-en\n"
+            f"  - youtube-shorts\n"
+            f"status: draft\n"
+            f"scheduled_for: \n"
+            f"auto_publish: false\n"
+            f"use_queue: true\n"
+            f"source: manual\n"
+            f"source_url: \n"
+            f"images: \n"
+            f"cloudinary_urls: {{}}\n"
+            f"late_post_ids: {{}}\n"
+            f"published_at: \n"
+            f"---\n"
+        )
+
+        lines = [""]
         if post.brief:
             lines += [post.brief, ""]
         lines += [
@@ -363,7 +384,7 @@ def save_to_content_vault(posts: list[SocialPost], manual_dir: Path) -> list[Pat
             "",
         ]
 
-        file_path.write_text("\n".join(lines), encoding="utf-8")
+        file_path.write_text(frontmatter + "\n".join(lines), encoding="utf-8")
         written_paths.append(file_path)
         print(f"  Saved: {month_label}/{file_path.name}")
 
