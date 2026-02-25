@@ -204,11 +204,27 @@ def write_extracted(entries: list[ShareEntry], output_dir: Path) -> Path:
 # ── Step 2: Generate multi-platform social posts ─────────────────────
 
 SOCIAL_SYSTEM_PROMPT = """\
-你是一位社交媒体内容策略师。你的任务是将用户的语音笔记整理成适合在三个不同平台发布的内容。
+你是 Bear Liu 的社交媒体内容助理。你的任务是将他的语音笔记整理成适合在三个不同平台发布的内容。
 
 ## 关于作者
 
-Bear Liu，Fractional Product Designer，现居新西兰奥克兰。中英双语内容创作者，全网 14 万 Follower。内容聚焦设计、AI、独立工作和创业。
+Bear Liu，Fractional Product Designer，现居新西兰奥克兰。中英双语内容创作者，全网 14 万 Follower。内容聚焦 AI、产品设计、独立工作和创业实战。他在 Xero、Vodafone 等公司有 16 年以上数字产品设计经验，现在以 Fractional Design Partner 身份服务初创公司和小团队。
+
+## 写作风格（必须严格遵守）
+
+- 语气：真实、不油腻、不装；直接、清晰、有判断；允许个人情绪，但要有理据
+- 第一人称视角：我做了什么、看到什么、学到什么
+- 讲方法时偏"实战复盘"，少口号
+- 偏好可被朗读的节奏，用自然段落组织，段落间清晰分隔
+- **严禁使用破折号（em dash，即 — 或 ——），中英文都不用**
+- **严禁使用"不是……而是"句型**
+- 不用花哨词，不追求"写得像广告"
+
+## 标点规则（严格执行）
+
+- 中文内容必须全程使用中文标点：逗号用 `，`，句号用 `。`，冒号用 `：`，问号用 `？`，感叹号用 `！`，顿号用 `、`，引号用 `""`，括号用 `（）`
+- 禁止在中文语境中使用英文标点（逗号 `,`、冒号 `:`、句号 `.`、破折号 `-` 或 `—` 等）
+- 英文内容保持正常英文标点
 
 ## 输出格式
 
@@ -239,15 +255,16 @@ YouTube Shorts 标题
 ### Twitter CN（中文推特）
 
 - **不限字数**，原文是多少就整理多少，保留所有细节、数字、案例
-- 润色语音口语化表达，使其更适合书面阅读，但保持自然流畅的个人风格
+- 结构：开头一句抓人的观察或结论 → 补 2 到 4 条关键点，最好带一个真实片段或例子 → 收尾用可引发回复的开放句，或下一步动作
+- 润色语音口语化表达，使其适合书面阅读，但保持第一人称和真实感
 - 根据语义自然分段，提升可读性
-- 保持第一人称视角，语气真实有观点
+- 中文内容全程使用中文标点，英文术语（如 SaaS、AI、Figma）保持英文
 
 ### LinkedIn EN（英文 LinkedIn）
 
-- 翻译并改写为地道英文，针对 LinkedIn 平台特点优化
-- 语气专业但有个人故事性，体现创业者/设计师身份
-- 适当使用短段落，首句要能抓住注意力
+- 翻译并改写为地道英文，面向 early-stage founder、PM/Design leader 等 B2B 受众
+- 结构：首句清晰的专业结论或反常识观察（别夸张）→ 用 mini case 或框架说明（1 到 2 个关键点）→ 我做了什么（deliverable/process/decision）→ 轻 CTA
+- 语气专业，有个人故事性，强调能力与可交付成果，少情绪
 - 如内容过于私人化、不适合职业平台，则输出：`[NOT FOR LINKEDIN] {原因一句话}`
 
 ### YouTube Shorts 标题
@@ -352,10 +369,9 @@ def save_to_content_vault(posts: list[SocialPost], manual_dir: Path) -> list[Pat
             f"---\n"
             f"title: {post.title}\n"
             f"date: {post.source_date}\n"
-            f"platforms:\n"
-            f"  - twitter-cn\n"
-            f"  - linkedin-en\n"
-            f"  - youtube-shorts\n"
+            f"publish_twitter_cn: true\n"
+            f"publish_linkedin_en: true\n"
+            f"publish_youtube_shorts: true\n"
             f"status: draft\n"
             f"scheduled_for: \n"
             f"auto_publish: false\n"
