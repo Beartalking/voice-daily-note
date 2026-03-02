@@ -40,10 +40,7 @@ class ShareEntry:
 @dataclass
 class SocialPost:
     title: str
-    brief: str
     twitter_cn: str
-    linkedin_en: str
-    youtube_shorts: str
     source_date: str
 
 
@@ -204,7 +201,7 @@ def write_extracted(entries: list[ShareEntry], output_dir: Path) -> Path:
 # ── Step 2: Generate multi-platform social posts ─────────────────────
 
 SOCIAL_SYSTEM_PROMPT = """\
-你是 Bear Liu 的社交媒体内容助理。你的任务是将他的语音笔记整理成适合在三个不同平台发布的内容。
+你是 Bear Liu 的 Twitter 内容助理。你的任务是将他的语音笔记整理成适合在 Twitter 发布的中文内容。
 
 ## 关于作者
 
@@ -224,7 +221,6 @@ Bear Liu，Fractional Product Designer，现居新西兰奥克兰。中英双语
 
 - 中文内容必须全程使用中文标点：逗号用 `，`，句号用 `。`，冒号用 `：`，问号用 `？`，感叹号用 `！`，顿号用 `、`，引号用 `""`，括号用 `（）`
 - 禁止在中文语境中使用英文标点（逗号 `,`、冒号 `:`、句号 `.`、破折号 `-` 或 `—` 等）
-- 英文内容保持正常英文标点
 
 ## 输出格式
 
@@ -233,16 +229,8 @@ Bear Liu，Fractional Product Designer，现居新西兰奥克兰。中英双语
 ```
 ## 标题（可微调使其更吸引人）
 
-简述：用 1-2 句话概括这条内容的核心。
-
 ---twitter-cn---
 推特中文内容
-
----linkedin-en---
-LinkedIn 英文内容
-
----youtube-shorts---
-YouTube Shorts 标题
 ```
 
 不同条目之间用 `===` 分隔。
@@ -250,28 +238,12 @@ YouTube Shorts 标题
 
 ---
 
-## 各平台具体要求
+## Twitter CN 整理要求
 
-### Twitter CN（中文推特）
-
-- **不限字数**，原文是多少就整理多少，保留所有细节、数字、案例
-- 结构：开头一句抓人的观察或结论 → 补 2 到 4 条关键点，最好带一个真实片段或例子 → 收尾用可引发回复的开放句，或下一步动作
-- 润色语音口语化表达，使其适合书面阅读，但保持第一人称和真实感
+- **不压缩、不删减**，原文说了多少整理多少，保留所有细节、数字、案例
+- 仅润色语音口语化表达，使其适合书面阅读，保持第一人称和真实感
 - 根据语义自然分段，提升可读性
-- 中文内容全程使用中文标点，英文术语（如 SaaS、AI、Figma）保持英文
-
-### LinkedIn EN（英文 LinkedIn）
-
-- 翻译并改写为地道英文，面向 early-stage founder、PM/Design leader 等 B2B 受众
-- 结构：首句清晰的专业结论或反常识观察（别夸张）→ 用 mini case 或框架说明（1 到 2 个关键点）→ 我做了什么（deliverable/process/decision）→ 轻 CTA
-- 语气专业，有个人故事性，强调能力与可交付成果，少情绪
-- 如内容过于私人化、不适合职业平台，则输出：`[NOT FOR LINKEDIN] {原因一句话}`
-
-### YouTube Shorts 标题
-
-- 一行标题，简洁有力，能让人想点击
-- 在标题末尾或行内加 1-3 个英文 hashtag（如 #ProductDesign #AITools #Figma）
-- 标题尽量用英文，但如果内容是中文为主可以用中文标题 + 英文 hashtag\
+- 英文术语（如 SaaS、AI、Figma）保持英文\
 """
 
 
@@ -318,19 +290,9 @@ def _parse_social_posts(output_dir: Path, source_entries: list[ShareEntry]) -> l
             continue
         title = title_match.group(1).strip()
 
-        # Extract brief
-        brief_match = re.search(r"简述[：:]\s*(.+?)(?=\n---twitter-cn---|$)", block, re.DOTALL)
-        brief = brief_match.group(1).strip() if brief_match else ""
-
-        # Extract sections
-        def _extract_section(tag: str) -> str:
-            pattern = rf"---{tag}---\s*\n(.*?)(?=\n---\w|$)"
-            m = re.search(pattern, block, re.DOTALL)
-            return m.group(1).strip() if m else ""
-
-        twitter_cn = _extract_section("twitter-cn")
-        linkedin_en = _extract_section("linkedin-en")
-        youtube_shorts = _extract_section("youtube-shorts")
+        # Extract twitter-cn section
+        m = re.search(r"---twitter-cn---\s*\n(.*?)(?=\n---\w|$)", block, re.DOTALL)
+        twitter_cn = m.group(1).strip() if m else ""
 
         source_date = source_entries[i].source_date if i < len(source_entries) else ""
         if not source_date:
@@ -339,10 +301,7 @@ def _parse_social_posts(output_dir: Path, source_entries: list[ShareEntry]) -> l
 
         posts.append(SocialPost(
             title=title,
-            brief=brief,
             twitter_cn=twitter_cn,
-            linkedin_en=linkedin_en,
-            youtube_shorts=youtube_shorts,
             source_date=source_date,
         ))
 
@@ -370,8 +329,6 @@ def save_to_content_vault(posts: list[SocialPost], manual_dir: Path) -> list[Pat
             f"title: {post.title}\n"
             f"date: {post.source_date}\n"
             f"publish_twitter_cn: true\n"
-            f"publish_linkedin_en: true\n"
-            f"publish_youtube_shorts: true\n"
             f"status: draft\n"
             f"scheduled_for: \n"
             f"auto_publish: false\n"
@@ -385,18 +342,10 @@ def save_to_content_vault(posts: list[SocialPost], manual_dir: Path) -> list[Pat
             f"---\n"
         )
 
-        lines = [""]
-        if post.brief:
-            lines += [post.brief, ""]
-        lines += [
+        lines = [
+            "",
             "---twitter-cn---",
             post.twitter_cn,
-            "",
-            "---linkedin-en---",
-            post.linkedin_en,
-            "",
-            "---youtube-shorts---",
-            post.youtube_shorts,
             "",
         ]
 

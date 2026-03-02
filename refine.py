@@ -183,7 +183,10 @@ def _write_output_md(date: str, entry_count: int, refined_text: str):
     """Write the final MD file with YAML front matter."""
     front_matter = f"---\ndate: {date}\ntype: daily-note\nentries: {entry_count}\n---\n\n"
     content = front_matter + refined_text
-    output_path = OUTPUT_DIR / f"{date}.md"
+    year, month = date[:4], date[5:7]
+    output_dir = OUTPUT_DIR / year / month
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"{date}.md"
     output_path.write_text(content, encoding="utf-8")
     return output_path
 
@@ -207,7 +210,8 @@ def refine_all(force: bool = False, dry_run: bool = False) -> tuple[int, int, in
     failed = 0
 
     for date, entries in groups.items():
-        output_path = OUTPUT_DIR / f"{date}.md"
+        year, month = date[:4], date[5:7]
+        output_path = OUTPUT_DIR / year / month / f"{date}.md"
         if output_path.exists() and not force:
             print(f"  [SKIP] {date}.md already exists")
             skipped += 1
