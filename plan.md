@@ -2,13 +2,13 @@
 
 ## Overview
 
-One-command pipeline that converts voice memos into polished daily Markdown notes, then generates multi-platform social posts from selected entries.
+One-command pipeline that converts voice memos into polished daily Markdown notes, then generates Twitter CN social posts from selected entries.
 
 ```
 Recording/*.wav → transcripts/*.txt → output/YYYY-MM-DD.md → Obsidian Daily Notes
                                                     ↓ (#Share entries)
                               Bear Content Vault/Social Posts/drafts/manual/YYYY-MM/
-                              (Twitter CN + LinkedIn EN + YouTube Shorts per post)
+                              (Twitter CN only)
 ```
 
 ---
@@ -33,14 +33,11 @@ Recording/*.wav → transcripts/*.txt → output/YYYY-MM-DD.md → Obsidian Dail
 - Support for multi-tag entries (`#Diary #Share`, `#Work #Share`)
 - Per-post MD files saved to `Social Posts/drafts/manual/YYYY-MM/YYYY-MM-DD-title.md`
 
-### Social Post Generation (v1.3)
+### Social Post Generation (v1.3 → v1.4)
 - `share_to_social.py` — replaces `share_to_linkedin.py`
-- Single Claude API call generates all 3 platforms per entry:
-  - Twitter CN: full-length Chinese, no character limit
-  - LinkedIn EN: English, LinkedIn-optimised tone
-  - YouTube Shorts: title + 1–3 hashtags
+- 简化为仅生成 Twitter CN（全文中文，无字数限制）
+- LinkedIn EN 和 YouTube Shorts 已移除
 - Output saves directly to Bear Content Vault manual drafts folder
-- Fixed token budget (4x input multiplier to prevent truncation)
 
 ### Buzz CLI Fix
 - Fixed Buzz CLI: added missing `add` subcommand (was launching GUI and timing out)

@@ -42,6 +42,9 @@ TOKEN_MULTIPLIER = 1.2
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 2  # seconds
 
+# ── Archive Retention ────────────────────────────────────────────────
+ARCHIVE_RETENTION_DAYS = 7  # delete archived audio older than this many days
+
 # ── Quality Check ────────────────────────────────────────────────────
 MAX_CHAR_SHRINK_RATIO = 0.15  # warn if refined text shrinks more than 15%
 

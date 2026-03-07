@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Share to Social: extract #Share entries → Twitter CN + LinkedIn EN + YouTube Shorts → Content Vault."""
+"""Share to Social: extract #Share entries → Twitter CN → Content Vault."""
 from __future__ import annotations
 
 import argparse
@@ -329,7 +329,7 @@ def save_to_content_vault(posts: list[SocialPost], manual_dir: Path) -> list[Pat
             f"title: {post.title}\n"
             f"date: {post.source_date}\n"
             f"publish_twitter_cn: true\n"
-            f"status: draft\n"
+            f"ready: false\n"
             f"scheduled_for: \n"
             f"auto_publish: false\n"
             f"use_queue: true\n"
@@ -360,7 +360,7 @@ def save_to_content_vault(posts: list[SocialPost], manual_dir: Path) -> list[Pat
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Share to Social: extract #Share → Twitter CN + LinkedIn EN + YouTube Shorts → Content Vault"
+        description="Share to Social: extract #Share → Twitter CN → Content Vault"
     )
     parser.add_argument(
         "--step",

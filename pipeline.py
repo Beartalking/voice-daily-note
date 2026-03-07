@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import shutil
 from collections import defaultdict
+from datetime import date, timedelta
 from typing import Optional
 
-from config import ARCHIVE_DIR, RECORDING_DIR, ensure_dirs, parse_args
+from config import ARCHIVE_DIR, ARCHIVE_RETENTION_DAYS, RECORDING_DIR, ensure_dirs, parse_args
 from refine import refine_all
 from transcribe import discover_audio_files, transcribe_all
 
@@ -40,12 +41,40 @@ def archive_files(files, dry_run: bool = False) -> int:
     return moved
 
 
+def cleanup_old_archives(dry_run: bool = False, retention_days: int = ARCHIVE_RETENTION_DAYS) -> int:
+    """Delete archive subdirectories older than retention_days. Returns count of deleted dirs."""
+    cutoff = date.today() - timedelta(days=retention_days)
+    deleted = 0
+
+    if not ARCHIVE_DIR.exists():
+        return 0
+
+    for subdir in sorted(ARCHIVE_DIR.iterdir()):
+        if not subdir.is_dir():
+            continue
+        try:
+            dir_date = date.fromisoformat(subdir.name)
+        except ValueError:
+            continue  # skip non-date directories
+
+        if dir_date < cutoff:
+            if dry_run:
+                print(f"  [DRY-RUN] Would delete: archive/{subdir.name}/")
+            else:
+                shutil.rmtree(subdir)
+                print(f"  Deleted: archive/{subdir.name}/")
+            deleted += 1
+
+    return deleted
+
+
 def print_summary(
     step: Optional[str],
     audio_files: list,
     t_ok: int, t_skip: int, t_fail: int,
     r_ok: int, r_skip: int, r_fail: int,
     archived: int,
+    deleted: int = 0,
 ):
     """Print a summary of the pipeline run."""
     print("\n" + "=" * 50)
@@ -64,6 +93,8 @@ def print_summary(
 
     if step is None and archived > 0:
         print(f"  Archived          : {archived} files")
+    if step is None and deleted > 0:
+        print(f"  Old archives del. : {deleted} dir(s) (>{ARCHIVE_RETENTION_DAYS}d)")
 
     print("=" * 50)
 
@@ -80,6 +111,7 @@ def main():
     t_ok = t_skip = t_fail = 0
     r_ok = r_skip = r_fail = 0
     archived = 0
+    deleted = 0
 
     # ── Step 1: Transcribe ───────────────────────────────────────
     if args.step is None or args.step == "transcribe":
@@ -125,12 +157,19 @@ def main():
         elif t_fail > 0 or r_fail > 0:
             print("\n[Step 3] Skipping archive (there were failures)")
 
+    # ── Step 4: Cleanup old archives ─────────────────────────────
+    if args.step is None:
+        print(f"\n[Step 4] Cleaning up archives older than {ARCHIVE_RETENTION_DAYS} days...")
+        deleted = cleanup_old_archives(dry_run=args.dry_run)
+        if deleted == 0:
+            print("  Nothing to clean up.")
+
     # ── Summary ──────────────────────────────────────────────────
     print_summary(
         args.step, audio_files,
         t_ok, t_skip, t_fail,
         r_ok, r_skip, r_fail,
-        archived,
+        archived, deleted,
     )
 
 
