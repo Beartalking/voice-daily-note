@@ -43,6 +43,13 @@ Recording/*.wav → transcripts/*.txt → output/YYYY-MM-DD.md → Obsidian Dail
 - Fixed Buzz CLI: added missing `add` subcommand (was launching GUI and timing out)
 - Added output filename rename logic (Buzz appends timestamp; normalize to `stem.txt`)
 
+### Writing Style Integration (v1.5)
+- `share_to_social.py` prompt 从简化版升级为基于 `writing-style.md` 的完整写作风格
+- 注入：声音定位、70/30 叙事比例、句式节奏、标志性词汇、情绪回收技术、禁止清单、Twitter 结构模板、中英文混合规则
+- 任务从"润色口语"升级为"用 Bear 声音重写"
+- `#Share` 标签匹配改为大小写不敏感（`#share`、`#Share` 均可）
+- 新增 `_sanitize_output()` 后处理：自动清除破折号（`—`/`——` → `，`）
+
 ---
 
 ## Backlog
