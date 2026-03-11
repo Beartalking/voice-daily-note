@@ -9,6 +9,7 @@ from datetime import date, timedelta
 from typing import Optional
 
 from config import ARCHIVE_DIR, ARCHIVE_RETENTION_DAYS, RECORDING_DIR, ensure_dirs, parse_args
+from convo_summary import summarize_convo_all
 from refine import refine_all
 from transcribe import discover_audio_files, transcribe_all
 
@@ -144,6 +145,18 @@ def main():
             force=args.force,
             dry_run=args.dry_run,
         )
+
+    # ── Step 2.5: Convo Summaries ─────────────────────────────────
+    if args.step is None or args.step == "refine":
+        print("\n[Step 2.5] Generating #Convo summaries...")
+        c_files, c_summaries = summarize_convo_all(
+            force=args.force,
+            dry_run=args.dry_run,
+        )
+        if c_summaries > 0:
+            print(f"  Generated {c_summaries} summary(ies) across {c_files} file(s)")
+        else:
+            print("  No #Convo entries to summarize")
 
     # ── Step 3: Archive ──────────────────────────────────────────
     if args.step is None and not args.no_archive and audio_files:
