@@ -20,10 +20,14 @@ from config import (
     MAX_RETRIES,
     MIN_MAX_TOKENS,
     RETRY_BASE_DELAY,
-    SHARING_INPUT_DIR,
     SHARING_OUTPUT_DIR,
     TOKEN_MULTIPLIER,
     get_api_key,
+)
+
+# ── Obsidian Daily Notes source ─────────────────────────────────────
+DAILY_NOTES_BASE = Path(
+    "/Users/bearliu/Library/Mobile Documents/iCloud~md~obsidian/Documents/Bear Vault/Daily notes"
 )
 
 
@@ -101,24 +105,39 @@ def _parse_entries_from_file(filepath: Path) -> list[ShareEntry]:
     return results
 
 
-def extract_share_entries(input_dir: Path) -> list[ShareEntry]:
-    """Scan all .md files in input_dir and collect #Share entries."""
-    if not input_dir.exists():
-        print(f"  Input directory not found: {input_dir}")
+def extract_share_entries_from_daily_notes() -> list[ShareEntry]:
+    """Scan Obsidian Daily Notes directly for #Share entries, skipping already-processed dates."""
+    if not DAILY_NOTES_BASE.exists():
+        print(f"  Daily Notes directory not found: {DAILY_NOTES_BASE}")
         return []
+
+    processed_dates = _collect_processed_dates()
+    if processed_dates:
+        print(f"  Found {len(processed_dates)} dates already processed in Content Vault")
+
+    from datetime import timedelta
+    cutoff_date = (datetime.today() - timedelta(days=7)).strftime("%Y-%m-%d")
 
     all_entries = []
-    md_files = sorted(input_dir.glob("*.md"))
+    for md_file in sorted(DAILY_NOTES_BASE.rglob("*.md")):
+        date_match = re.search(r"(\d{4}-\d{2}-\d{2})", md_file.stem)
+        if not date_match:
+            continue
+        file_date = date_match.group(1)
 
-    if not md_files:
-        print(f"  No .md files found in {input_dir}")
-        return []
+        if file_date < cutoff_date:
+            continue
+        if file_date in processed_dates:
+            continue
 
-    for f in md_files:
-        entries = _parse_entries_from_file(f)
+        text = md_file.read_text(encoding="utf-8")
+        if "#Share" not in text:
+            continue
+
+        entries = _parse_entries_from_file(md_file)
         all_entries.extend(entries)
         if entries:
-            print(f"  Found {len(entries)} #Share entries in {f.name}")
+            print(f"  Found {len(entries)} #Share entries in {md_file.name}")
 
     return all_entries
 
@@ -133,7 +152,7 @@ def _call_claude(api_key: str, system_prompt: str, user_message: str, output_mul
         "content-type": "application/json",
     }
     estimated_tokens = int(len(user_message) * output_multiplier)
-    max_tokens = max(MIN_MAX_TOKENS, estimated_tokens)
+    max_tokens = min(64000, max(MIN_MAX_TOKENS, estimated_tokens))
 
     payload = {
         "model": CLAUDE_MODEL,
@@ -483,7 +502,7 @@ def save_to_content_vault(posts: list[SocialPost], manual_dir: Path) -> list[Pat
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Share to Social: extract #Share → Twitter CN → Content Vault"
+        description="Share to Social: extract #Share from Daily Notes → Twitter CN → Content Vault"
     )
     parser.add_argument(
         "--step",
@@ -496,25 +515,35 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Preview extracted entries without calling the API or writing to vault",
     )
-    parser.add_argument(
-        "--input-dir",
-        type=Path,
-        default=None,
-        help=f"Input directory containing daily note MD files (default: {SHARING_INPUT_DIR})",
-    )
     return parser.parse_args()
+
+
+CONTENT_VAULT_SOCIAL_BASE = Path(
+    "/Users/bearliu/Library/Mobile Documents/iCloud~md~obsidian/Documents/Bear Content Vault/Social Posts"
+)
+
+
+def _collect_processed_dates() -> set:
+    """Scan all Social Posts (drafts + published) to find dates already processed."""
+    processed = set()
+    if not CONTENT_VAULT_SOCIAL_BASE.exists():
+        return processed
+    for md_file in CONTENT_VAULT_SOCIAL_BASE.rglob("*.md"):
+        date_match = re.match(r"(\d{4}-\d{2}-\d{2})", md_file.name)
+        if date_match:
+            processed.add(date_match.group(1))
+    return processed
 
 
 def main():
     args = parse_args()
-    input_dir = args.input_dir or SHARING_INPUT_DIR
     output_dir = SHARING_OUTPUT_DIR
 
-    # Step 1: Extract
-    print("Step 1: Extracting #Share entries...")
-    entries = extract_share_entries(input_dir)
+    # Step 1: Extract #Share entries directly from Obsidian Daily Notes
+    print("Step 1: Scanning Daily Notes for #Share entries...")
+    entries = extract_share_entries_from_daily_notes()
     if not entries:
-        print("  No #Share entries found. Nothing to do.")
+        print("  No new #Share entries found. Nothing to do.")
         return
 
     print(f"  Total: {len(entries)} #Share entries extracted")
@@ -533,9 +562,9 @@ def main():
         print("Done (extract only).")
         return
 
-    # Step 2: Generate social posts
+    # Step 2: Generate social posts via Claude API
     api_key = get_api_key()
-    print("\nStep 2: Generating multi-platform social posts...")
+    print("\nStep 2: Generating social posts...")
     out = generate_social_posts(api_key, output_dir)
     print(f"  -> {out}")
 
@@ -543,7 +572,7 @@ def main():
         print("Done (extract + generate).")
         return
 
-    # Step 3: Save to Content Vault
+    # Step 3: Save to Content Vault (Social Posts/drafts/manual/)
     print("\nStep 3: Saving to Content Vault...")
     posts = _parse_social_posts(output_dir, entries)
     written = save_to_content_vault(posts, CONTENT_VAULT_MANUAL_DIR)
@@ -554,6 +583,11 @@ def main():
             print(f"    {p}")
     else:
         print("  No new posts (all entries already exist).")
+
+    # Clean up temp pipeline files
+    for f in output_dir.glob("*"):
+        if f.is_file():
+            f.unlink()
 
     print("\nDone!")
 
