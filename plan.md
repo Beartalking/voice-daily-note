@@ -5,10 +5,12 @@
 One-command pipeline that converts voice memos into polished daily Markdown notes, then generates Twitter CN social posts from selected entries.
 
 ```
-Recording/*.wav → transcripts/*.txt → output/YYYY-MM-DD.md → Obsidian Daily Notes
-                                                    ↓ (#Share entries)
+Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
+                                        ↓ (#Convo entries)
+                                   auto-append structured summary
+                                        ↓ (#Share entries)
                               Bear Content Vault/Social Posts/drafts/manual/YYYY-MM/
-                              (Twitter CN only)
+                              (Twitter CN only, reads Daily Notes directly)
 ```
 
 ---
@@ -50,16 +52,24 @@ Recording/*.wav → transcripts/*.txt → output/YYYY-MM-DD.md → Obsidian Dail
 - `#Share` 标签匹配改为大小写不敏感（`#share`、`#Share` 均可）
 - 新增 `_sanitize_output()` 后处理：自动清除破折号（`—`/`——` → `，`）
 
+### Share 流水线简化 (v1.6)
+- `share_to_social.py` 去掉 `sharing_input/` 中间目录，直接从 Obsidian Daily Notes 扫描 `#Share` 条目
+- 保留 7 天窗口 + 已处理日期跳过的幂等逻辑
+- 输出仍写入 `Social Posts/drafts/manual/`
+
+### #Convo 对话摘要 (v1.7)
+- `refinement_prompt.py` 新增 `#Convo` 标签，支持多标签组合（如 `#Work #Convo`）
+- `convo_summary.py` 扫描精修笔记中的 `#Convo` 条目，调 Claude 生成结构化摘要（场景、参与者、要点、下一步行动）
+- 摘要追加在原文下方，幂等：已有摘要自动跳过
+- 缺少上下文时用 `[待补充]` 占位；录音开头/结尾有场景说明时自动提取
+- `pipeline.py` Step 2 精修后自动执行 Step 2.5 Convo 摘要
+
 ---
 
 ## Backlog
-
-- [ ] **会议/通话录音总结**：单独的 pipeline，输入一段会议或通话录音，输出结构化摘要（议题、决策、行动项），存入 Obsidian 或 Content Vault
 
 - [ ] Chunk long audio before transcription (support recordings > 30 min)
 
 - [ ] Post-refinement character count validation with auto-retry if content shrinks > 15%
 
 - [ ] iPhone Voice Memo `.m4a` filename pattern support
-
-- [ ] `sharing_input/` auto-cleanup: remove processed files after successful vault save
