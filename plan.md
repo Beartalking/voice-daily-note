@@ -54,7 +54,7 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 
 ### Share 流水线简化 (v1.6)
 - `share_to_social.py` 去掉 `sharing_input/` 中间目录，直接从 Obsidian Daily Notes 扫描 `#Share` 条目
-- 保留 7 天窗口 + 已处理日期跳过的幂等逻辑
+- 保留 7 天窗口 + 按标题去重的幂等逻辑（v1.6.1 从按日期去重改为按标题去重，同一天新增 #Share 条目不再被跳过）
 - 输出仍写入 `Social Posts/drafts/manual/`
 
 ### #Convo 对话摘要 (v1.7)
@@ -72,4 +72,4 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 
 - [ ] Post-refinement character count validation with auto-retry if content shrinks > 15%
 
-- [ ] iPhone Voice Memo `.m4a` filename pattern support
+- [ ] iPhone Voice Memo `.m4a` filename pattern support（当前需手动重命名为 `YYYYMMDD-N.m4a` 格式）

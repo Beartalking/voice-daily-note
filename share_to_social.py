@@ -105,15 +105,23 @@ def _parse_entries_from_file(filepath: Path) -> list[ShareEntry]:
     return results
 
 
+def _normalize_title(title: str) -> str:
+    """Normalize title for dedup comparison: lowercase, no spaces/punctuation."""
+    t = title.lower().strip()
+    # Remove all non-alphanumeric (keep CJK chars as \w matches them)
+    t = re.sub(r"[^\w]", "", t)
+    return t
+
+
 def extract_share_entries_from_daily_notes() -> list[ShareEntry]:
-    """Scan Obsidian Daily Notes directly for #Share entries, skipping already-processed dates."""
+    """Scan Obsidian Daily Notes directly for #Share entries, skipping already-processed ones."""
     if not DAILY_NOTES_BASE.exists():
         print(f"  Daily Notes directory not found: {DAILY_NOTES_BASE}")
         return []
 
-    processed_dates = _collect_processed_dates()
-    if processed_dates:
-        print(f"  Found {len(processed_dates)} dates already processed in Content Vault")
+    processed_titles = _collect_processed_titles()
+    if processed_titles:
+        print(f"  Found {len(processed_titles)} titles already processed in Content Vault")
 
     from datetime import timedelta
     cutoff_date = (datetime.today() - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -127,17 +135,27 @@ def extract_share_entries_from_daily_notes() -> list[ShareEntry]:
 
         if file_date < cutoff_date:
             continue
-        if file_date in processed_dates:
-            continue
 
         text = md_file.read_text(encoding="utf-8")
         if "#Share" not in text:
             continue
 
         entries = _parse_entries_from_file(md_file)
-        all_entries.extend(entries)
-        if entries:
-            print(f"  Found {len(entries)} #Share entries in {md_file.name}")
+        # Filter out entries whose titles are already processed
+        new_entries = []
+        for entry in entries:
+            normalized = _normalize_title(entry.title)
+            if any(normalized in pt or pt in normalized for pt in processed_titles):
+                continue
+            new_entries.append(entry)
+
+        if new_entries:
+            skipped = len(entries) - len(new_entries)
+            msg = f"  Found {len(new_entries)} new #Share entries in {md_file.name}"
+            if skipped:
+                msg += f" ({skipped} already processed)"
+            print(msg)
+        all_entries.extend(new_entries)
 
     return all_entries
 
@@ -523,15 +541,23 @@ CONTENT_VAULT_SOCIAL_BASE = Path(
 )
 
 
-def _collect_processed_dates() -> set:
-    """Scan all Social Posts (drafts + published) to find dates already processed."""
+def _collect_processed_titles() -> set:
+    """Scan all Social Posts (drafts + published) to find normalized titles already processed."""
     processed = set()
     if not CONTENT_VAULT_SOCIAL_BASE.exists():
         return processed
     for md_file in CONTENT_VAULT_SOCIAL_BASE.rglob("*.md"):
-        date_match = re.match(r"(\d{4}-\d{2}-\d{2})", md_file.name)
+        stem = md_file.stem
+        date_match = re.match(r"\d{4}-\d{2}-\d{2}-(.+)", stem)
         if date_match:
-            processed.add(date_match.group(1))
+            processed.add(_normalize_title(date_match.group(1)))
+        try:
+            text = md_file.read_text(encoding="utf-8")
+            title_match = re.search(r"^title:\s*[\"']?(.+?)[\"']?\s*$", text, re.MULTILINE)
+            if title_match:
+                processed.add(_normalize_title(title_match.group(1)))
+        except Exception:
+            pass
     return processed
 
 
