@@ -9,6 +9,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 import requests
 
@@ -113,21 +114,28 @@ def _normalize_title(title: str) -> str:
     return t
 
 
-def extract_share_entries_from_daily_notes() -> list[ShareEntry]:
+def extract_share_entries_from_daily_notes(
+    input_dir: Optional[str] = None,
+    force: bool = False,
+) -> list[ShareEntry]:
     """Scan Obsidian Daily Notes directly for #Share entries, skipping already-processed ones."""
-    if not DAILY_NOTES_BASE.exists():
-        print(f"  Daily Notes directory not found: {DAILY_NOTES_BASE}")
+    base = Path(input_dir) if input_dir else DAILY_NOTES_BASE
+    if not base.exists():
+        print(f"  Daily Notes directory not found: {base}")
         return []
 
-    processed_titles = _collect_processed_titles()
-    if processed_titles:
-        print(f"  Found {len(processed_titles)} titles already processed in Content Vault")
+    if force:
+        processed_titles = set()
+    else:
+        processed_titles = _collect_processed_titles()
+        if processed_titles:
+            print(f"  Found {len(processed_titles)} titles already processed in Content Vault")
 
     from datetime import timedelta
     cutoff_date = (datetime.today() - timedelta(days=7)).strftime("%Y-%m-%d")
 
     all_entries = []
-    for md_file in sorted(DAILY_NOTES_BASE.rglob("*.md")):
+    for md_file in sorted(base.rglob("*.md")):
         date_match = re.search(r"(\d{4}-\d{2}-\d{2})", md_file.stem)
         if not date_match:
             continue
@@ -533,6 +541,17 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Preview extracted entries without calling the API or writing to vault",
     )
+    parser.add_argument(
+        "--input-dir",
+        type=str,
+        default=None,
+        help="Read daily notes from this local directory instead of Obsidian vault",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Skip dedup check and reprocess all #Share entries",
+    )
     return parser.parse_args()
 
 
@@ -566,8 +585,12 @@ def main():
     output_dir = SHARING_OUTPUT_DIR
 
     # Step 1: Extract #Share entries directly from Obsidian Daily Notes
-    print("Step 1: Scanning Daily Notes for #Share entries...")
-    entries = extract_share_entries_from_daily_notes()
+    source_label = args.input_dir or "Obsidian Daily Notes"
+    print(f"Step 1: Scanning {source_label} for #Share entries...")
+    entries = extract_share_entries_from_daily_notes(
+        input_dir=args.input_dir,
+        force=args.force,
+    )
     if not entries:
         print("  No new #Share entries found. Nothing to do.")
         return
