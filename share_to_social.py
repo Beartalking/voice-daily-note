@@ -114,6 +114,44 @@ def _normalize_title(title: str) -> str:
     return t
 
 
+def _extract_keywords(title: str) -> set:
+    """Extract significant keywords from a title for fuzzy dedup.
+
+    Pulls out English words (3+ chars) and Chinese character sequences,
+    so cross-language titles like 'Obsidian vs Notion' and 'Obsidian与Notion的对比思考'
+    can be matched by shared proper nouns.
+    """
+    t = title.lower()
+    # English words (3+ chars)
+    en_words = set(w for w in re.findall(r"[a-z]{3,}", t))
+    # Chinese character runs (2+ chars, to skip single-char particles)
+    cn_words = set(re.findall(r"[\u4e00-\u9fff]{2,}", t))
+    return en_words | cn_words
+
+
+def _is_duplicate(new_title: str, processed_titles: set, processed_keywords: dict) -> bool:
+    """Check if a title matches any already-processed title.
+
+    Uses two strategies:
+    1. Substring match on normalized titles (existing logic)
+    2. Keyword overlap: if 50%+ of the new title's keywords appear in a processed title
+    """
+    normalized = _normalize_title(new_title)
+    # Strategy 1: substring match
+    if any(normalized in pt or pt in normalized for pt in processed_titles):
+        return True
+    # Strategy 2: keyword overlap
+    new_kw = _extract_keywords(new_title)
+    if len(new_kw) < 2:
+        return False
+    for proc_title, proc_kw in processed_keywords.items():
+        overlap = new_kw & proc_kw
+        # 2+ shared keywords is enough (covers cross-language titles sharing proper nouns)
+        if len(overlap) >= 2:
+            return True
+    return False
+
+
 def extract_share_entries_from_daily_notes(
     input_dir: Optional[str] = None,
     force: bool = False,
@@ -126,8 +164,9 @@ def extract_share_entries_from_daily_notes(
 
     if force:
         processed_titles = set()
+        processed_keywords = {}
     else:
-        processed_titles = _collect_processed_titles()
+        processed_titles, processed_keywords = _collect_processed_titles()
         if processed_titles:
             print(f"  Found {len(processed_titles)} titles already processed in Content Vault")
 
@@ -152,8 +191,7 @@ def extract_share_entries_from_daily_notes(
         # Filter out entries whose titles are already processed
         new_entries = []
         for entry in entries:
-            normalized = _normalize_title(entry.title)
-            if any(normalized in pt or pt in normalized for pt in processed_titles):
+            if _is_duplicate(entry.title, processed_titles, processed_keywords):
                 continue
             new_entries.append(entry)
 
@@ -560,24 +598,32 @@ CONTENT_VAULT_SOCIAL_BASE = Path(
 )
 
 
-def _collect_processed_titles() -> set:
-    """Scan all Social Posts (drafts + published) to find normalized titles already processed."""
+def _collect_processed_titles():
+    """Scan all Social Posts (drafts + published) to find titles already processed.
+
+    Returns (normalized_titles_set, keywords_dict) for both substring and keyword matching.
+    """
     processed = set()
+    keywords = {}  # raw_title -> keyword_set
     if not CONTENT_VAULT_SOCIAL_BASE.exists():
-        return processed
+        return processed, keywords
     for md_file in CONTENT_VAULT_SOCIAL_BASE.rglob("*.md"):
         stem = md_file.stem
         date_match = re.match(r"\d{4}-\d{2}-\d{2}-(.+)", stem)
         if date_match:
-            processed.add(_normalize_title(date_match.group(1)))
+            raw = date_match.group(1)
+            processed.add(_normalize_title(raw))
+            keywords[raw] = _extract_keywords(raw)
         try:
             text = md_file.read_text(encoding="utf-8")
             title_match = re.search(r"^title:\s*[\"']?(.+?)[\"']?\s*$", text, re.MULTILINE)
             if title_match:
-                processed.add(_normalize_title(title_match.group(1)))
+                raw = title_match.group(1)
+                processed.add(_normalize_title(raw))
+                keywords[raw] = _extract_keywords(raw)
         except Exception:
             pass
-    return processed
+    return processed, keywords
 
 
 def main():
