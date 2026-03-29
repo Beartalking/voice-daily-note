@@ -3,6 +3,7 @@
 """Step 2: Group transcripts by date, call Claude API for refinement, output MD files."""
 from __future__ import annotations
 
+import json
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -25,6 +26,21 @@ from config import (
 from refinement_prompt import SYSTEM_PROMPT
 from transcribe import extract_timestamp
 
+REFINED_LEDGER = TRANSCRIPTS_DIR / ".refined_ledger.json"
+
+
+def _load_ledger():
+    # type: () -> dict
+    """Load the set of transcript filenames already refined, keyed by date."""
+    if REFINED_LEDGER.exists():
+        return json.loads(REFINED_LEDGER.read_text(encoding="utf-8"))
+    return {}
+
+
+def _save_ledger(ledger):
+    # type: (dict) -> None
+    REFINED_LEDGER.write_text(json.dumps(ledger, indent=2, ensure_ascii=False), encoding="utf-8")
+
 
 def _read_text(p: Path) -> str:
     """Read text file with encoding fallback."""
@@ -37,15 +53,19 @@ def _read_text(p: Path) -> str:
     return data.decode("utf-8", errors="replace")
 
 
-def group_transcripts_by_date() -> dict[str, list[tuple[str, str]]]:
+def group_transcripts_by_date():
+    # type: () -> tuple[dict[str, list[tuple[str, str]]], dict[str, list[str]]]
     """
     Read all TXT files in transcripts/, group by date.
-    Returns {date: [(time, content), ...]} sorted by time within each date.
+    Returns:
+      - groups: {date: [(time, content), ...]} sorted by time within each date
+      - filenames: {date: [filename, ...]} for ledger tracking
     """
     if not TRANSCRIPTS_DIR.exists():
-        return {}
+        return {}, {}
 
-    groups: dict[str, list[tuple[str, str, int]]] = defaultdict(list)
+    groups = defaultdict(list)  # type: dict[str, list[tuple[str, str, int]]]
+    file_map = defaultdict(list)  # type: dict[str, list[str]]
     skipped = []
 
     for p in sorted(TRANSCRIPTS_DIR.glob("*.txt")):
@@ -59,17 +79,18 @@ def group_transcripts_by_date() -> dict[str, list[tuple[str, str]]]:
             print(f"  [SKIP] Empty transcript: {p.name}")
             continue
         groups[date].append((time_str, content, seq))
+        file_map[date].append(p.name)
 
     if skipped:
         print(f"  Skipped {len(skipped)} transcript files (no timestamp)")
 
     # Sort each group by time then sequence, and strip seq from output
-    result: dict[str, list[tuple[str, str]]] = {}
+    result = {}  # type: dict[str, list[tuple[str, str]]]
     for date in sorted(groups.keys()):
         entries = sorted(groups[date], key=lambda x: (x[0], x[2]))
         result[date] = [(t, c) for t, c, _ in entries]
 
-    return result
+    return result, dict(file_map)
 
 
 def _detect_language(text: str) -> str:
@@ -179,27 +200,37 @@ def _check_shrinkage(original: str, refined: str, date: str):
         )
 
 
-def _write_output_md(date: str, entry_count: int, refined_text: str):
-    """Write the final MD file with YAML front matter."""
-    front_matter = f"---\ndate: {date}\ntype: daily-note\nentries: {entry_count}\n---\n\n"
-    content = front_matter + refined_text
+def _write_output_md(date: str, entry_count: int, refined_text: str, append: bool = False):
+    """Write the final MD file with YAML front matter, or append to existing."""
     year, month = date[:4], date[5:7]
     output_dir = OUTPUT_DIR / year / month
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{date}.md"
-    output_path.write_text(content, encoding="utf-8")
+
+    if append and output_path.exists():
+        existing = output_path.read_text(encoding="utf-8")
+        separator = "\n\n---\n\n"
+        content = existing.rstrip() + separator + refined_text
+        output_path.write_text(content, encoding="utf-8")
+    else:
+        front_matter = f"---\ndate: {date}\ntype: daily-note\nentries: {entry_count}\n---\n\n"
+        content = front_matter + refined_text
+        output_path.write_text(content, encoding="utf-8")
     return output_path
 
 
-def refine_all(force: bool = False, dry_run: bool = False) -> tuple[int, int, int]:
+def refine_all(force=False, dry_run=False):
+    # type: (bool, bool) -> tuple
     """
     Refine all grouped transcripts.
     Returns (success_count, skipped_count, failed_count).
     """
-    groups = group_transcripts_by_date()
+    groups, file_map = group_transcripts_by_date()
     if not groups:
         print("  No transcripts found to refine")
         return 0, 0, 0
+
+    ledger = _load_ledger()
 
     api_key = None
     if not dry_run:
@@ -212,21 +243,46 @@ def refine_all(force: bool = False, dry_run: bool = False) -> tuple[int, int, in
     for date, entries in groups.items():
         year, month = date[:4], date[5:7]
         output_path = OUTPUT_DIR / year / month / f"{date}.md"
-        if output_path.exists() and not force:
-            print(f"  [SKIP] {date}.md already exists")
+        current_files = set(file_map.get(date, []))
+        processed_files = set(ledger.get(date, []))
+        new_files = current_files - processed_files
+
+        if not new_files and not force:
+            print(f"  [SKIP] {date}: all {len(current_files)} transcript(s) already refined")
             skipped += 1
             continue
 
+        # Filter entries to only new transcripts (unless force)
+        if new_files and not force and processed_files:
+            # Only refine the new entries
+            new_entries = []
+            for t_time, t_content in entries:
+                # Match entry back to filename via file_map
+                for fname in new_files:
+                    ts = extract_timestamp(fname)
+                    if ts and ts[1] == t_time:
+                        new_entries.append((t_time, t_content))
+                        break
+            if not new_entries:
+                print(f"  [SKIP] {date}: no new entries to refine")
+                skipped += 1
+                continue
+            entries = new_entries
+
+        append_mode = output_path.exists() and bool(processed_files)
+
         if dry_run:
             total_chars = sum(len(c) for _, c in entries)
+            action = "APPEND" if append_mode else "CREATE"
             print(
-                f"  [DRY-RUN] {date}: {len(entries)} entries, "
-                f"~{total_chars} chars -> output/{date}.md"
+                f"  [DRY-RUN] {date}: {len(entries)} entries ({len(new_files)} new), "
+                f"~{total_chars} chars -> {action} output/{date}.md"
             )
             skipped += 1
             continue
 
-        print(f"  Refining {date} ({len(entries)} entries)...")
+        action_label = "Appending to" if append_mode else "Refining"
+        print(f"  {action_label} {date} ({len(entries)} entries, {len(new_files)} new)...")
         user_message = _build_user_message(date, entries)
         max_tokens = _estimate_max_tokens(user_message)
 
@@ -242,8 +298,12 @@ def refine_all(force: bool = False, dry_run: bool = False) -> tuple[int, int, in
             print(f"    WARNING: Response was truncated for {date}")
 
         _check_shrinkage(user_message, refined, date)
-        out = _write_output_md(date, len(entries), refined)
-        print(f"    -> {out.name}")
+        out = _write_output_md(date, len(entries), refined, append=append_mode)
+        print(f"    -> {out.name}" + (" [APPENDED]" if append_mode else ""))
+
+        # Update ledger with all files for this date
+        ledger[date] = sorted(current_files)
+        _save_ledger(ledger)
         success += 1
 
     return success, skipped, failed
