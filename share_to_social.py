@@ -155,6 +155,7 @@ def _is_duplicate(new_title: str, processed_titles: set, processed_keywords: dic
 def extract_share_entries_from_daily_notes(
     input_dir: Optional[str] = None,
     force: bool = False,
+    days_back: int = 7,
 ) -> list[ShareEntry]:
     """Scan Obsidian Daily Notes directly for #Share entries, skipping already-processed ones."""
     base = Path(input_dir) if input_dir else DAILY_NOTES_BASE
@@ -171,7 +172,7 @@ def extract_share_entries_from_daily_notes(
             print(f"  Found {len(processed_titles)} titles already processed in Content Vault")
 
     from datetime import timedelta
-    cutoff_date = (datetime.today() - timedelta(days=7)).strftime("%Y-%m-%d")
+    cutoff_date = (datetime.today() - timedelta(days=days_back)).strftime("%Y-%m-%d")
 
     all_entries = []
     for md_file in sorted(base.rglob("*.md")):
@@ -590,6 +591,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip dedup check and reprocess all #Share entries",
     )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=7,
+        help="Number of days to look back for #Share entries (default: 7)",
+    )
     return parser.parse_args()
 
 
@@ -636,6 +643,7 @@ def main():
     entries = extract_share_entries_from_daily_notes(
         input_dir=args.input_dir,
         force=args.force,
+        days_back=args.days,
     )
     if not entries:
         print("  No new #Share entries found. Nothing to do.")

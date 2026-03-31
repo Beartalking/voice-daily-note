@@ -70,6 +70,12 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 - 只精修新增 transcript，已处理的自动跳过；`--force` 跳过 ledger 全量重跑
 - 修复旧逻辑：之前已有笔记直接跳过，导致当天新录音内容丢失
 
+### 流水线 A→B 衔接 + 可配置回溯 (v1.9)
+- `share_to_social.py` 新增 `--days` 参数，回溯天数可配置（默认 7 天），替代硬编码
+- 流水线 B 默认直接从 Obsidian vault 扫描，A 完成后 B 自动衔接，不再需要手动复制文件到 `sharing_input/`
+- `--input-dir` 保留作为 override，但不再是主流程
+- SKILL.md 文档同步更新
+
 ---
 
 ## Backlog
