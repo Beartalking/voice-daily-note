@@ -11,6 +11,7 @@ from typing import Optional
 from config import ARCHIVE_DIR, ARCHIVE_RETENTION_DAYS, RECORDING_DIR, ensure_dirs, parse_args
 from convo_summary import summarize_convo_all
 from refine import refine_all
+from text_inbox import process_inbox
 from transcribe import discover_audio_files, transcribe_all
 
 
@@ -76,6 +77,7 @@ def print_summary(
     r_ok: int, r_skip: int, r_fail: int,
     archived: int,
     deleted: int = 0,
+    ti_ok: int = 0, ti_skip: int = 0, ti_fail: int = 0,
 ):
     """Print a summary of the pipeline run."""
     print("\n" + "=" * 50)
@@ -91,6 +93,7 @@ def print_summary(
 
     if step is None or step == "refine":
         print(f"  Refined           : {r_ok} ok, {r_skip} skipped, {r_fail} failed")
+        print(f"  Text inbox        : {ti_ok} ok, {ti_skip} skipped, {ti_fail} failed")
 
     if step is None and archived > 0:
         print(f"  Archived          : {archived} files")
@@ -111,6 +114,7 @@ def main():
     audio_files = []
     t_ok = t_skip = t_fail = 0
     r_ok = r_skip = r_fail = 0
+    ti_ok = ti_skip = ti_fail = 0
     archived = 0
     deleted = 0
 
@@ -158,6 +162,16 @@ def main():
         else:
             print("  No #Convo entries to summarize")
 
+    # ── Step 2.6: Text Inbox ────────────────────────────────────
+    if args.step is None or args.step == "refine":
+        print("\n[Step 2.6] Processing text inbox...")
+        ti_ok, ti_skip, ti_fail = process_inbox(
+            force=args.force,
+            dry_run=args.dry_run,
+        )
+        if ti_ok == 0 and ti_skip == 0:
+            print("  No files in inbox")
+
     # ── Step 3: Archive ──────────────────────────────────────────
     if args.step is None and not args.no_archive and audio_files:
         # Only archive if both transcribe and refine succeeded (no failures)
@@ -183,6 +197,7 @@ def main():
         t_ok, t_skip, t_fail,
         r_ok, r_skip, r_fail,
         archived, deleted,
+        ti_ok, ti_skip, ti_fail,
     )
 
 

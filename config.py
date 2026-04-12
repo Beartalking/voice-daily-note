@@ -26,6 +26,15 @@ CONTENT_VAULT_MANUAL_DIR = Path(
     "/Users/bearliu/Library/Mobile Documents/iCloud~md~obsidian/Documents/Bear Content Vault/Social Posts/drafts/manual"
 )
 
+# ── Text Inbox ──────────────────────────────────────────────────────
+TEXT_INBOX_DIR = Path(
+    os.environ.get(
+        "TEXT_INBOX_DIR",
+        "/Users/bearliu/Library/Mobile Documents/com~apple~CloudDocs/Obsidian/Bear Vault/_inbox/text",
+    )
+)
+TEXT_INBOX_LEDGER = BASE_DIR / ".text_inbox_ledger.json"
+
 # ── Transcription ────────────────────────────────────────────────────
 BUZZ_CLI = "/Applications/Buzz.app/Contents/MacOS/Buzz"
 WHISPER_MODEL_SIZE = "medium"

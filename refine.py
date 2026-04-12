@@ -23,6 +23,7 @@ from config import (
     TRANSCRIPTS_DIR,
     get_api_key,
 )
+from daily_note_writer import get_daily_note_path, write_daily_note
 from refinement_prompt import SYSTEM_PROMPT
 from transcribe import extract_timestamp
 
@@ -200,23 +201,13 @@ def _check_shrinkage(original: str, refined: str, date: str):
         )
 
 
-def _write_output_md(date: str, entry_count: int, refined_text: str, append: bool = False):
-    """Write the final MD file with YAML front matter, or append to existing."""
-    year, month = date[:4], date[5:7]
-    output_dir = OUTPUT_DIR / year / month
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f"{date}.md"
+def _write_output_md(date, entry_count, refined_text, append=False):
+    # type: (str, int, str, bool) -> Path
+    """Write the final MD file with YAML front matter, or append to existing.
 
-    if append and output_path.exists():
-        existing = output_path.read_text(encoding="utf-8")
-        separator = "\n\n---\n\n"
-        content = existing.rstrip() + separator + refined_text
-        output_path.write_text(content, encoding="utf-8")
-    else:
-        front_matter = f"---\ndate: {date}\ntype: daily-note\nentries: {entry_count}\n---\n\n"
-        content = front_matter + refined_text
-        output_path.write_text(content, encoding="utf-8")
-    return output_path
+    Delegates to shared daily_note_writer for consistent behavior across pipelines.
+    """
+    return write_daily_note(date, entry_count, refined_text, append=append)
 
 
 def refine_all(force=False, dry_run=False):
@@ -241,8 +232,7 @@ def refine_all(force=False, dry_run=False):
     failed = 0
 
     for date, entries in groups.items():
-        year, month = date[:4], date[5:7]
-        output_path = OUTPUT_DIR / year / month / f"{date}.md"
+        output_path = get_daily_note_path(date)
         current_files = set(file_map.get(date, []))
         processed_files = set(ledger.get(date, []))
         new_files = current_files - processed_files
