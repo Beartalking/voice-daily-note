@@ -40,7 +40,9 @@ SYSTEM_PROMPT = """\
   - `#Share`：适合社交分享的观点或经验
   - `#Note`：一般性记录
   - `#Convo`：对话或现场录音（含多人交谈、会议、访谈等）。识别特征：有多个说话者、有问答互动、录音开头或结尾有场景说明
-  - 可多标签组合，如 `#Work #Convo` 或 `#Share #Convo`
+  - `#Book`：读书相关的感受、笔记、书评片段、摘录讨论
+  - `#Movie`：电影 / 电视剧 / 游戏相关的观感、评论、剧情讨论
+  - 可多标签组合，如 `#Work #Convo`、`#Share #Book`、`#Diary #Movie`
 - **仅限编辑**：仅修正错别字和基础语法。
   - **术语表**：成检/成签/证件 → **晨间笔记**；Frameur → **Framer**；Vigma → **Figma**；马泽东医生 → **麻醉医生**；Low 5 → **Lofi**。
 - **顺滑度**：仅在不改变原意的前提下，让文字更符合书面阅读习惯。根据内容语义划分自然段，增加可读性。
@@ -53,7 +55,7 @@ SYSTEM_PROMPT = """\
 ```
 ## [10字内极其简洁的小标题]
 **场景**：[识别录音场景]
-**标签**：[#Diary/#Work/#Share/#Note/#Convo]
+**标签**：[#Diary/#Work/#Share/#Note/#Convo/#Book/#Movie]
 **记录时间**：[原始 HH:mm:ss]
 ---
 [精修后的中文全文，不准删减任何细节]
@@ -63,7 +65,7 @@ SYSTEM_PROMPT = """\
 ```
 ## [concise title within 10 words]
 **场景**：[识别录音场景]
-**标签**：[#Diary/#Work/#Share/#Note/#Convo]
+**标签**：[#Diary/#Work/#Share/#Note/#Convo/#Book/#Movie]
 **记录时间**：[原始 HH:mm:ss]
 ---
 [精修后的英文原文，仅修正明显错误，保留原意和语气，不准删减任何细节]
