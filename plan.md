@@ -70,6 +70,14 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 - 只精修新增 transcript，已处理的自动跳过；`--force` 跳过 ledger 全量重跑
 - 修复旧逻辑：之前已有笔记直接跳过，导致当天新录音内容丢失
 
+### 流水线 D：书架同步 (v2.0)
+- 新增 `#Book` / `#Movie` 标签（`refinement_prompt.py` 第 38–43、56、66 行）
+- 新增 `bookshelf_sync.py`：扫 Daily Notes 带标签条目 → Claude 提取作品 → 模糊匹配 Books/Movies 现有文件 → 在目标文件 `## 后续笔记` 段末尾 append 新日期分节
+- 独立 `bookshelf_sync_tracker.json` 做去重，键为 `{daily_note_path}#{timestamp}`
+- 0 命中时自动调 `reader-library/add_book.py` 或 `movie-library/add_movie.py` 建档（游戏除外，需人工指定 Steam URL）
+- 多命中时交互选择（`--batch` 模式跳过）
+- 与流水线 B 并行工作，同一条笔记可同时带 `#Share #Book` 被两个流水线独立处理
+
 ### 流水线 A→B 衔接 + 可配置回溯 (v1.9)
 - `share_to_social.py` 新增 `--days` 参数，回溯天数可配置（默认 7 天），替代硬编码
 - 流水线 B 默认直接从 Obsidian vault 扫描，A 完成后 B 自动衔接，不再需要手动复制文件到 `sharing_input/`
