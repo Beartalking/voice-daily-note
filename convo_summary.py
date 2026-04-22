@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 import time
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -20,6 +21,9 @@ from config import (
     RETRY_BASE_DELAY,
     get_api_key,
 )
+
+DEFAULT_SCAN_DAYS = 30
+DAILY_NOTE_FILENAME_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})\.md$")
 
 CONVO_SUMMARY_PROMPT = """\
 你是一位会议和对话记录整理助手。你的任务是为一段对话录音的转录文本生成结构化摘要。
@@ -193,8 +197,29 @@ def summarize_convo_in_file(filepath: Path, api_key: str, dry_run: bool = False)
     return generated
 
 
-def summarize_convo_all(force: bool = False, dry_run: bool = False) -> Tuple[int, int]:
-    """Scan all output daily notes for #Convo entries and generate summaries.
+def _within_window(md_file: Path, cutoff: Optional[date]) -> bool:
+    """Return True if filename date >= cutoff. Non-matching filenames are skipped."""
+    if cutoff is None:
+        return True
+    m = DAILY_NOTE_FILENAME_RE.match(md_file.name)
+    if not m:
+        return False
+    try:
+        file_date = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return False
+    return file_date >= cutoff
+
+
+def summarize_convo_all(
+    force: bool = False,
+    dry_run: bool = False,
+    days: Optional[int] = DEFAULT_SCAN_DAYS,
+) -> Tuple[int, int]:
+    """Scan recent daily notes for #Convo entries and generate summaries.
+
+    Only daily notes with filenames within the last `days` days are scanned.
+    Pass days=None to scan the entire vault (for manual backfill).
 
     Returns (files_processed, summaries_generated).
     """
@@ -206,10 +231,16 @@ def summarize_convo_all(force: bool = False, dry_run: bool = False) -> Tuple[int
     if not dry_run:
         api_key = get_api_key()
 
+    cutoff = (datetime.now().date() - timedelta(days=days)) if days is not None else None
+    if cutoff is not None:
+        print(f"  Scan window: last {days} days (>= {cutoff.isoformat()})")
+
     files_processed = 0
     total_summaries = 0
 
     for md_file in sorted(OUTPUT_DIR.rglob("*.md")):
+        if not _within_window(md_file, cutoff):
+            continue
         text = md_file.read_text(encoding="utf-8")
         if "#Convo" not in text:
             continue
