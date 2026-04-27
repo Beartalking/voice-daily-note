@@ -64,7 +64,7 @@ TRACKER_PATH = SCRIPT_DIR / "bookshelf_sync_tracker.json"
 
 ADD_BOOK_SCRIPT = Path("/Users/bearliu/Desktop/ClaudeCode/reader-library/add_book.py")
 ADD_MOVIE_SCRIPT = Path(
-    "/Users/bearliu/Desktop/ClaudeCode/movie-library/add_movie.py"
+    "/Users/bearliu/Desktop/ClaudeCode/movie-notes/add_movie.py"
 )
 
 
@@ -349,9 +349,10 @@ def auto_create(work: dict, tag_type: str):
         title = work.get("title_en") or work.get("title_cn") or ""
         if not title:
             return None
+        script = ADD_MOVIE_SCRIPT
         cmd = [
             "python3",
-            str(ADD_MOVIE_SCRIPT),
+            str(script),
             title,
             "--type",
             work_type,
