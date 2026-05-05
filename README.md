@@ -40,7 +40,7 @@ Daily Notes/*.md  →  01_extracted.md  →  02_social.md  →  Bear Content Vau
 ```bash
 # 在 .env 文件里设置（复制 .env.example）
 ANTHROPIC_API_KEY=sk-ant-...
-OUTPUT_DIR=/path/to/Obsidian/Daily notes   # 输出到 Obsidian vault
+OUTPUT_DIR=/path/to/Obsidian/10_Daily   # 输出到 Obsidian vault
 ```
 
 ### 每日笔记

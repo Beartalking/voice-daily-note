@@ -55,7 +55,7 @@ from config import (
 VAULT_ROOT = Path(
     "/Users/bearliu/Library/Mobile Documents/iCloud~md~obsidian/Documents/Bear Vault"
 )
-DAILY_NOTES_DIR = VAULT_ROOT / "Daily notes"
+DAILY_NOTES_DIR = VAULT_ROOT / "10_Daily"
 BOOKS_DIR = VAULT_ROOT / "Books"
 MOVIES_DIR = VAULT_ROOT / "Movies"
 
@@ -341,11 +341,6 @@ def auto_create(work: dict, tag_type: str):
         cmd = ["python3", str(script), title]
     else:  # movie tag
         work_type = (work.get("type") or "movie").lower()
-        if work_type == "game":
-            print(
-                f"    ⚠️  #Movie type=game 需要 --steam 人工指定，跳过 {work.get('title_en') or work.get('title_cn')}"
-            )
-            return None
         title = work.get("title_en") or work.get("title_cn") or ""
         if not title:
             return None

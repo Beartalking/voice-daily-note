@@ -28,7 +28,7 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 
 ### Obsidian Integration (v1.1)
 - `OUTPUT_DIR` env var routes daily notes to Obsidian vault
-- Daily notes land in Bear Vault/Daily notes/
+- Daily notes land in Bear Vault/10_Daily/YYYY/MM/
 
 ### Share Pipeline (v1.2)
 - `share_pipeline.py` — extract `#Share` entries from daily notes → Claude refinement → save individual posts to Bear Content Vault

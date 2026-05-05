@@ -28,7 +28,7 @@ from config import (
 
 # ── Obsidian Daily Notes source ─────────────────────────────────────
 DAILY_NOTES_BASE = Path(
-    "/Users/bearliu/Library/Mobile Documents/iCloud~md~obsidian/Documents/Bear Vault/Daily notes"
+    "/Users/bearliu/Library/Mobile Documents/iCloud~md~obsidian/Documents/Bear Vault/10_Daily"
 )
 
 
