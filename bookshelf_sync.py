@@ -56,8 +56,8 @@ VAULT_ROOT = Path(
     "/Users/bearliu/Library/Mobile Documents/iCloud~md~obsidian/Documents/Bear Vault"
 )
 DAILY_NOTES_DIR = VAULT_ROOT / "10_Daily"
-BOOKS_DIR = VAULT_ROOT / "Books"
-MOVIES_DIR = VAULT_ROOT / "Movies"
+BOOKS_DIR = VAULT_ROOT / "40_Books"
+MOVIES_DIR = VAULT_ROOT / "41_Movies"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 TRACKER_PATH = SCRIPT_DIR / "bookshelf_sync_tracker.json"
