@@ -81,7 +81,9 @@ EXTRACTION_SYSTEM = """你从一条 Obsidian daily note 笔记块中提取被明
 判断规则：
 - 只提取笔记中明确命名、且 Bear 有实际观感/阅读感受的作品
 - 作品名以拉丁字母为主时用英文原名（如 "Severance" 而非 "人生切割术"）
-- 中文原作（如《长安的荔枝》）title_en 写拼音或留空都可以，title_cn 必填
+- 中文原作（如《长安的荔枝》）title_en 必须留空（绝不要写拼音），title_cn 必填
+- 只提取 Bear 真正阅读 / 观看过、有实际体验的作品；仅作对比、顺带提及、举例引用而 Bear 并未实际读 / 看的作品，不要提取
+- 注意区分作者名与作品名：如「不如天然（《天然的有一年》…）」里作者是「天然」、作品名是《天然的有一年》本身要看上下文判断；拿不准作者与书名边界时，只提取能确定的作品名，宁缺毋滥
 - 作品类型参考：书=book；剧集/动画/纪录片=tv；单部电影=movie；电子游戏=game
 - 无明确作品返回 []
 
@@ -314,8 +316,16 @@ def build_followup_block(entry: dict) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def append_followup(target: Path, entry: dict) -> None:
+def append_followup(target: Path, entry: dict) -> bool:
+    """Append this entry's followup block. Idempotent: returns False (no write)
+    if the entry's block is already present, so re-runs never duplicate."""
     content = target.read_text(encoding="utf-8").rstrip()
+
+    # Idempotency guard: skip if this exact entry block already exists
+    block_marker = f"### {entry['date']} · {entry['heading']}"
+    if block_marker in content:
+        return False
+
     # Remove any trailing --- to keep file tidy
     content = re.sub(r"\n+---\s*$", "", content).rstrip()
 
@@ -328,6 +338,7 @@ def append_followup(target: Path, entry: dict) -> None:
 
     content += "\n"
     target.write_text(content, encoding="utf-8")
+    return True
 
 
 # --- Auto-create -----------------------------------------------------
@@ -360,7 +371,8 @@ def auto_create(work: dict, tag_type: str):
     if proc.returncode != 0:
         print(f"    ❌ 建档失败: {proc.stderr[:300]}")
         return None
-    m = re.search(r"已创建[:：]?\s*(.+)", proc.stdout)
+    # add_book.py 输出 "Created: <path>"，add_movie.py 输出 "已创建: <path>"
+    m = re.search(r"(?:已创建|Created)[:：]?\s*(.+)", proc.stdout)
     if not m:
         print(f"    ⚠️  无法从输出解析文件路径: {proc.stdout[:200]}")
         return None
@@ -427,7 +439,8 @@ def main():
             continue
 
         target_dir = BOOKS_DIR if entry["tag_type"] == "book" else MOVIES_DIR
-        tracker_targets = tracker.setdefault(key, [])
+        tracker_targets = list(tracker.get(key, []))
+        all_ok = True  # every work in this entry resolved to a target
 
         for work in works:
             label = work.get("title_cn") or work.get("title_en") or "?"
@@ -447,6 +460,7 @@ def main():
                     created_files += 1
                     print(f"    ✅ 新建: {target.relative_to(VAULT_ROOT)}")
                 else:
+                    all_ok = False  # build failed (e.g. API down) -> retry next run
                     continue
             else:
                 print(f"    多个匹配 ({len(matches)}):")
@@ -454,23 +468,33 @@ def main():
                     print(f"      [{i}] {m.relative_to(VAULT_ROOT)}")
                 if args.batch:
                     print("    (batch: 跳过)")
+                    all_ok = False
                     continue
                 choice = input("    选择编号 (回车跳过): ").strip()
                 if not choice:
+                    all_ok = False
                     continue
                 try:
                     target = matches[int(choice)]
                 except (ValueError, IndexError):
+                    all_ok = False
                     continue
 
             if target is None or args.dry_run:
                 continue
 
-            append_followup(target, entry)
-            tracker_targets.append(str(target.relative_to(VAULT_ROOT)))
-            synced += 1
+            if append_followup(target, entry):
+                synced += 1
+            rel = str(target.relative_to(VAULT_ROOT))
+            if rel not in tracker_targets:
+                tracker_targets.append(rel)
 
-        if not args.dry_run:
+        # Only mark the entry as done when EVERY work resolved. If any work failed
+        # (API down, ambiguous match, etc.) leave the key unrecorded so the next run
+        # retries the failed works. append_followup is idempotent, so the already-
+        # synced works in the same entry won't be duplicated on that retry.
+        if not args.dry_run and works and all_ok:
+            tracker[key] = tracker_targets
             save_tracker(tracker)
 
     if args.dry_run:
