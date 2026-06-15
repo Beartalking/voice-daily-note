@@ -13,7 +13,9 @@ BASE_DIR = Path(__file__).resolve().parent
 
 # Load .env file from project root
 load_dotenv(BASE_DIR / ".env")
-RECORDING_DIR = BASE_DIR / "Recording"
+# Audio drop zone for the /capture command: drop recorder files here, run /capture,
+# they get transcribed then cleared (moved to archive/, auto-deleted after retention).
+RECORDING_DIR = Path("/Users/bearliu/Desktop/capture")
 TRANSCRIPTS_DIR = BASE_DIR / "transcripts"
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", str(BASE_DIR / "output")))
 ARCHIVE_DIR = BASE_DIR / "archive"
