@@ -193,13 +193,39 @@ def _format_entry(title, scene, tags, time_str, body):
 
 def discover_inbox_files():
     # type: () -> list[Path]
-    """Find all .md and .txt files in the inbox directory."""
+    """Find all .md and .txt files anywhere under the inbox directory.
+
+    Scans recursively so files are still picked up even if the upstream
+    Shortcut nests them under an extra sub-path. Observed in the field: a
+    doubled `Obsidian/Bear Vault/_inbox/text/` tree when the Shortcut's
+    hard-coded sub-path is appended onto an already-deep destination folder.
+    Anything under `processed/` is excluded.
+    """
     if not TEXT_INBOX_DIR.exists():
         return []
     files = []
     for ext in ("*.md", "*.txt"):
-        files.extend(TEXT_INBOX_DIR.glob(ext))
-    return sorted(files)
+        for p in TEXT_INBOX_DIR.rglob(ext):
+            if p.parent == PROCESSED_DIR or PROCESSED_DIR in p.parents:
+                continue
+            files.append(p)
+    return sorted(files, key=lambda p: p.name)
+
+
+def _prune_empty_dirs():
+    # type: () -> None
+    """Remove empty sub-directories left under the inbox (e.g. the nested
+    Obsidian/Bear Vault/_inbox/text tree some Shortcut configs create).
+    Deepest first; never touches processed/ or the inbox root itself.
+    """
+    subdirs = [p for p in TEXT_INBOX_DIR.rglob("*") if p.is_dir()]
+    for d in sorted(subdirs, key=lambda p: len(p.parts), reverse=True):
+        if d == PROCESSED_DIR or PROCESSED_DIR in d.parents:
+            continue
+        try:
+            d.rmdir()  # only succeeds when empty
+        except OSError:
+            pass
 
 
 def process_inbox(force=False, dry_run=False):
@@ -298,6 +324,9 @@ def process_inbox(force=False, dry_run=False):
         shutil.move(str(f), str(dest))
 
         success += 1
+
+    if not dry_run:
+        _prune_empty_dirs()
 
     return success, skipped, failed
 

@@ -32,7 +32,9 @@ CONTENT_VAULT_MANUAL_DIR = Path(
 TEXT_INBOX_DIR = Path(
     os.environ.get(
         "TEXT_INBOX_DIR",
-        "/Users/bearliu/Library/Mobile Documents/com~apple~CloudDocs/Obsidian/Bear Vault/_inbox/text",
+        # Obsidian iCloud container (launchd-readable). The legacy CloudDocs
+        # path com~apple~CloudDocs/... is a TCC zone launchd can't read (EDEADLK).
+        "/Users/bearliu/Library/Mobile Documents/iCloud~md~obsidian/Documents/Bear Vault/_inbox/text",
     )
 )
 TEXT_INBOX_LEDGER = BASE_DIR / ".text_inbox_ledger.json"
