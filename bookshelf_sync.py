@@ -342,9 +342,9 @@ def append_followup(target: Path, entry: dict) -> bool:
 
 
 # --- Auto-create -----------------------------------------------------
-def auto_create(work: dict, tag_type: str):
+def auto_create(work: dict, work_type: str):
     """Invoke add_book.py or add_movie.py; return created file path or None."""
-    if tag_type == "book":
+    if work_type == "book":
         script = ADD_BOOK_SCRIPT
         title = work.get("title_en") or work.get("title_cn") or ""
         if not title:
@@ -438,13 +438,17 @@ def main():
             print("    (未能提取作品)")
             continue
 
-        target_dir = BOOKS_DIR if entry["tag_type"] == "book" else MOVIES_DIR
         tracker_targets = list(tracker.get(key, []))
         all_ok = True  # every work in this entry resolved to a target
 
         for work in works:
             label = work.get("title_cn") or work.get("title_en") or "?"
             print(f"  • {label} ({work.get('type','?')})")
+
+            # 按每部作品自己的 type 分流，不跟条目标签走：
+            # 一条 #Book 笔记里可以顺口提到电影/游戏，反之亦然。
+            work_type = (work.get("type") or entry["tag_type"]).lower()
+            target_dir = BOOKS_DIR if work_type == "book" else MOVIES_DIR
 
             matches = find_match(work, target_dir)
             target = None
@@ -455,7 +459,7 @@ def main():
                 if args.dry_run:
                     print("    (dry-run: 会自动建档)")
                     continue
-                target = auto_create(work, entry["tag_type"])
+                target = auto_create(work, work_type)
                 if target:
                     created_files += 1
                     print(f"    ✅ 新建: {target.relative_to(VAULT_ROOT)}")

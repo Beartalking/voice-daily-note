@@ -84,6 +84,13 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 - `--input-dir` 保留作为 override，但不再是主流程
 - SKILL.md 文档同步更新
 
+### 流水线 D 修复：按作品 type 分流 (v2.1)
+- **Bug**：`bookshelf_sync.py` 用日记条目的标签（`entry["tag_type"]`）决定去 `40_Books/` 还是 `41_Movies/`，而不是用 Claude 提取出的每部作品自己的 `type`。后果：一条 `#Book` 笔记里顺口提到的电影会被 `add_book.py` 建进书库（2026-07-20《克拉拉与太阳》条目里提到的《人工智能》即中招）
+- **修复**：`target_dir` 和 `auto_create()` 的分流点都下移到 work 循环内，按 `work["type"]` 判断，条目标签仅作兜底。一条笔记里书 / 电影 / 游戏混着提也能各归各库
+- **同批发现的 TMDB 错配**：「后室」被译成 `The Backrooms` 后匹配到 *Into the Backrooms*（2019，12 分钟短片），真实片名是 `Backrooms`（2026，Kane Parsons，tmdb 1083381）。**译名多/少一个冠词就足以撞进同题材的另一部作品**，且光看片名核对不出来 —— 核对时要拿笔记里的具体情节去对 TMDB 简介（这次靠"家具店老板"对上 overview 里的 furniture showroom 才确认）
+- 同类前科：commit 4d6bb0c（Chuck's Life 撞库）、`feedback_bookshelf_sync_chinese_title_hallucination` 记忆条目。**自动建档结果必须逐条核对，这条规矩不能省**
+- 未动：「顺带提及也建档」的行为暂不收紧（Bear 决定先观察一轮），提取 prompt 保持原样
+
 ---
 
 ## Backlog
