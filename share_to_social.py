@@ -6,7 +6,7 @@ from __future__ import annotations
 import argparse
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -31,6 +31,11 @@ DAILY_NOTES_BASE = Path(
     "/Users/bearliu/Library/Mobile Documents/iCloud~md~obsidian/Documents/Bear Vault/10_Daily"
 )
 
+# Obsidian attachmentFolderPath is "./99_Assets" (sibling of each note), so a
+# pasted image ![[Pasted image ....png]] resolves to <note_dir>/99_Assets/<name>.
+ATTACHMENT_SUBDIR = "99_Assets"
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".heic", ".tiff", ".bmp"}
+
 
 # ── Data Model ──────────────────────────────────────────────────────
 
@@ -40,6 +45,7 @@ class ShareEntry:
     body: str
     source_file: str
     source_date: str
+    images: list = field(default_factory=list)  # absolute paths to attached images
 
 
 @dataclass
@@ -47,6 +53,63 @@ class SocialPost:
     title: str
     twitter_cn: str
     source_date: str
+    images: list = field(default_factory=list)  # absolute paths to attached images
+
+
+# ── Image extraction ────────────────────────────────────────────────
+
+def _extract_images_from_body(body: str, note_path: Path) -> tuple:
+    """Pull image attachments out of an entry body.
+
+    Handles Obsidian wikilink embeds ![[file.png]] and local markdown ![](path).
+    Returns (body_without_image_markdown, [absolute_image_paths]). Images are
+    resolved to the note's sibling 99_Assets folder (Obsidian attachmentFolderPath),
+    then a path relative to the note, then a fallback search under the daily-notes
+    tree by filename. Remote (http) markdown images are left in the text untouched.
+    """
+    image_paths: list = []
+    seen: set = set()
+
+    def _resolve(name: str) -> Optional[str]:
+        # Strip Obsidian size/alias suffix: ![[img.png|300]]
+        name = name.split("|", 1)[0].strip()
+        if not name or Path(name).suffix.lower() not in IMAGE_EXTENSIONS:
+            return None
+        filename = Path(name).name
+        # 1) sibling 99_Assets (the normal case for pasted images)
+        candidate = note_path.parent / ATTACHMENT_SUBDIR / filename
+        if candidate.exists():
+            return str(candidate.resolve())
+        # 2) path relative to the note (embed may carry its own folder)
+        candidate = note_path.parent / name
+        if candidate.exists():
+            return str(candidate.resolve())
+        # 3) fallback: search the daily-notes tree by filename
+        for match in DAILY_NOTES_BASE.rglob(filename):
+            return str(match.resolve())
+        return None
+
+    def _record(name: str) -> None:
+        resolved = _resolve(name)
+        if resolved and resolved not in seen:
+            seen.add(resolved)
+            image_paths.append(resolved)
+
+    for m in re.finditer(r"!\[\[([^\]]+)\]\]", body):
+        _record(m.group(1))
+    for m in re.finditer(r"!\[[^\]]*\]\(([^)]+)\)", body):
+        target = m.group(1).strip()
+        if target.startswith("http://") or target.startswith("https://"):
+            continue
+        _record(target)
+
+    # Strip local image markdown from the text (remote http images stay).
+    clean = re.sub(r"!\[\[[^\]]+\]\]", "", body)
+    clean = re.sub(
+        r"!\[[^\]]*\]\((?!https?://)[^)]+\)", "", clean
+    )
+    clean = re.sub(r"\n{3,}", "\n\n", clean).strip()
+    return clean, image_paths
 
 
 # ── Parsing ─────────────────────────────────────────────────────────
@@ -95,12 +158,17 @@ def _parse_entries_from_file(filepath: Path) -> list[ShareEntry]:
         else:
             body = parts[1].strip()
 
+        # Lift image attachments out of the body so they survive to the vault
+        # instead of being fed to Claude (which drops/mangles the markdown).
+        body, images = _extract_images_from_body(body, filepath)
+
         if body:
             results.append(ShareEntry(
                 title=title,
                 body=body,
                 source_file=filepath.name,
                 source_date=source_date,
+                images=images,
             ))
 
     return results
@@ -506,10 +574,13 @@ def _parse_social_posts(output_dir: Path, source_entries: list[ShareEntry]) -> l
             source_date = datetime.today().strftime("%Y-%m-%d")
             print(f"  WARNING: No source_date for '{title}', using today")
 
+        images = source_entries[i].images if i < len(source_entries) else []
+
         posts.append(SocialPost(
             title=title,
             twitter_cn=twitter_cn,
             source_date=source_date,
+            images=images,
         ))
 
     return posts
@@ -531,6 +602,16 @@ def save_to_content_vault(posts: list[SocialPost], manual_dir: Path) -> list[Pat
             print(f"  [SKIP] Already exists: {file_path.name}")
             continue
 
+        # Carry any attached images through as absolute paths. content-publisher
+        # uploads these to Cloudinary at publish time; they live in a different
+        # vault, so relative paths would not resolve.
+        if post.images:
+            images_block = "images:\n" + "".join(
+                f'  - "{p}"\n' for p in post.images
+            )
+        else:
+            images_block = "images: \n"
+
         frontmatter = (
             f"---\n"
             f"title: {post.title}\n"
@@ -542,7 +623,7 @@ def save_to_content_vault(posts: list[SocialPost], manual_dir: Path) -> list[Pat
             f"use_queue: true\n"
             f"source: manual\n"
             f"source_url: \n"
-            f"images: \n"
+            f"{images_block}"
             f"cloudinary_urls: {{}}\n"
             f"late_post_ids: {{}}\n"
             f"published_at: \n"
@@ -558,7 +639,8 @@ def save_to_content_vault(posts: list[SocialPost], manual_dir: Path) -> list[Pat
 
         file_path.write_text(frontmatter + "\n".join(lines), encoding="utf-8")
         written_paths.append(file_path)
-        print(f"  Saved: {month_label}/{file_path.name}")
+        img_note = f" (+{len(post.images)} image)" if post.images else ""
+        print(f"  Saved: {month_label}/{file_path.name}{img_note}")
 
     return written_paths
 
