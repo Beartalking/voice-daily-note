@@ -67,6 +67,17 @@ ADD_MOVIE_SCRIPT = Path(
     "/Users/bearliu/Desktop/ClaudeCode/movie-notes/add_movie.py"
 )
 
+# voice-capture folds routed commands (reminders / English captures / research)
+# into a collapsed archive block at the end of a daily note. Those blocks carry
+# their own **标签** line, so a reminder like "下载 Jim Dale 版哈利波特有声书"
+# tagged #Book would otherwise be picked up here as a reading entry. Strip the
+# block before parsing, same as insight-finder's note_utils.strip_routed_archive.
+ROUTED_ARCHIVE_RE = re.compile(
+    r"\n*<!--\s*voice-capture:archive:start\s*-->.*?"
+    r"<!--\s*voice-capture:archive:end\s*-->\n*",
+    re.DOTALL,
+)
+
 
 # --- Prompt ----------------------------------------------------------
 EXTRACTION_SYSTEM = """你从一条 Obsidian daily note 笔记块中提取被明确讨论的作品。
@@ -167,6 +178,7 @@ def extract_tagged_entries(days: int, only_tag: str | None):
             text = md_path.read_text(encoding="utf-8")
         except OSError:
             continue
+        text = ROUTED_ARCHIVE_RE.sub("\n", text)
         for block in split_blocks(text):
             tag_match = TAG_PATTERN.search(block)
             if not tag_match:

@@ -91,6 +91,13 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 - 同类前科：commit 4d6bb0c（Chuck's Life 撞库）、`feedback_bookshelf_sync_chinese_title_hallucination` 记忆条目。**自动建档结果必须逐条核对，这条规矩不能省**
 - 未动：「顺带提及也建档」的行为暂不收紧（Bear 决定先观察一轮），提取 prompt 保持原样
 
+### 流水线 D 修复：跳过 voice-capture 归档块 (v2.2, 2026-07-31)
+- **Bug**：`bookshelf_sync.py` 读日记后直接 `split_blocks`，没剥掉 voice-capture 的折叠归档块。归档块里的已路由命令自带 `**标签**` 行，一条 `#Note #Book` 的提醒（2026-07-12「下载 Jim Dale 版哈利波特有声书」）因此被当成读书条目，且归属错到了它前面那个 `## ` 条目的标题上
+- **后果**：每次运行都提取失败 → `all_ok=False` → 永不写 tracker → 30 天窗口内每跑一次白调一次 Claude
+- **修复**：新增 `ROUTED_ARCHIVE_RE`，`extract_tagged_entries()` 读文件后先 sub 掉再切块。正则与 `insight-finder/note_utils.py` 的 `strip_routed_archive` 保持一致（两个项目各自独立仓，六行正则选择复制而非跨仓 import）
+- **验证**：dry-run 命中数 11 → 10，误报条目消失，其余 10 条识别与匹配不受影响
+- 同批同步：《一个故事的99种讲法》→ Books、《杀手》三部曲 → `Hitman Trilogy.md`。后者是多候选人工选的，Claude 把 Alan Wake 也列为候选 —— 又一次印证中文标题模糊匹配要人工把关
+
 ---
 
 ## Backlog
