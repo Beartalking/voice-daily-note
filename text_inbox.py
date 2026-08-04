@@ -268,7 +268,17 @@ def process_inbox(force=False, dry_run=False):
             continue
 
         date_str, time_str = parsed
-        raw_text = _read_text(f).strip()
+
+        # iCloud may not have materialised this file locally yet (placeholder
+        # file): reading it raises OSError [Errno 11] Resource deadlock avoided.
+        # That's transient — the ledger means it'll be picked up on a later run
+        # — so skip just this file rather than aborting the whole batch.
+        try:
+            raw_text = _read_text(f).strip()
+        except OSError as e:
+            print(f"  [SKIP] {fname}: NOT AVAILABLE LOCALLY (iCloud has not downloaded this file yet) — {e}")
+            skipped += 1
+            continue
 
         if not raw_text:
             print(f"  [SKIP] {fname}: empty file")
