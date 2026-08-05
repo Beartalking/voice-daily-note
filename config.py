@@ -38,6 +38,10 @@ TEXT_INBOX_DIR = Path(
     )
 )
 TEXT_INBOX_LEDGER = BASE_DIR / ".text_inbox_ledger.json"
+# Lives next to the ledger on local disk, not in the iCloud inbox: flock on a
+# synced path is unreliable, and the lock only needs to be seen by processes on
+# this machine.
+TEXT_INBOX_LOCK = BASE_DIR / ".text_inbox.lock"
 
 # ── Transcription ────────────────────────────────────────────────────
 BUZZ_CLI = "/Applications/Buzz.app/Contents/MacOS/Buzz"

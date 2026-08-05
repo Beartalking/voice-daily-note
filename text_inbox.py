@@ -13,10 +13,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
+import os
 import re
 import shutil
 import time
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -30,6 +33,7 @@ from config import (
     RETRY_BASE_DELAY,
     TEXT_INBOX_DIR,
     TEXT_INBOX_LEDGER,
+    TEXT_INBOX_LOCK,
     get_api_key,
 )
 from daily_note_writer import get_daily_note_path, write_daily_note
@@ -228,12 +232,60 @@ def _prune_empty_dirs():
             pass
 
 
+@contextmanager
+def _inbox_lock():
+    """Hold an exclusive advisory lock for the duration of one inbox run.
+
+    launchd runs this pipeline daily at 09:30. A manual run starting in the same
+    minute used to race it: both loaded the ledger before either wrote it back,
+    so neither saw the other's work and the same inbox file was appended to the
+    daily note twice (observed 2026-08-06 on 2026-08-04_220755.txt).
+
+    flock is released by the kernel when the process exits, so a crashed or
+    killed run cannot leave a stale lock that blocks every later run.
+
+    Yields True when the lock was acquired, False when another run holds it.
+    """
+    TEXT_INBOX_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(TEXT_INBOX_LOCK), os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            yield False
+            return
+        try:
+            yield True
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
+
+
 def process_inbox(force=False, dry_run=False):
     # type: (bool, bool) -> tuple[int, int, int]
     """Process all inbox files.
 
+    Serialised against concurrent runs by an advisory lock; if another run is
+    already in progress this one does nothing rather than double-appending.
+
     Returns (success_count, skipped_count, failed_count).
     """
+    if dry_run:
+        # A dry run touches no ledger, note or lock file, so it neither needs
+        # the lock nor should be able to block the real run behind it.
+        return _process_inbox(force=force, dry_run=True)
+
+    with _inbox_lock() as acquired:
+        if not acquired:
+            print("  [LOCKED] another text_inbox run is in progress — skipping this run")
+            return 0, 0, 0
+        return _process_inbox(force=force, dry_run=False)
+
+
+def _process_inbox(force=False, dry_run=False):
+    # type: (bool, bool) -> tuple[int, int, int]
+    """Inbox run body. Call via process_inbox() so the lock is held."""
     TEXT_INBOX_DIR.mkdir(parents=True, exist_ok=True)
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 

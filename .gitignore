@@ -10,6 +10,9 @@ transcripts/
 # Runtime logs
 logs/
 
+# Concurrency lock (recreated per run; the ledger it guards stays tracked)
+.text_inbox.lock
+
 # Sharing pipeline (input/output)
 sharing_input/
 sharing_output/

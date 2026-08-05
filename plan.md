@@ -98,9 +98,20 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 - **验证**：dry-run 命中数 11 → 10，误报条目消失，其余 10 条识别与匹配不受影响
 - 同批同步：《一个故事的99种讲法》→ Books、《杀手》三部曲 → `Hitman Trilogy.md`。后者是多候选人工选的，Claude 把 Alan Wake 也列为候选 —— 又一次印证中文标题模糊匹配要人工把关
 
+### 流水线 C 修复：并发锁 (v2.3, 2026-08-06)
+- **Bug**：launchd 每天 09:30 跑流水线 C，同一分钟手动跑 `/capture` 会和它撞车。两个进程各自 `_load_ledger()` 读到同一份旧 ledger，谁都没看见对方的工作，同一个 inbox 文件被追加进日记两遍
+- **实例**：`2026-08-04_220755.txt`（「ChatGPT 语音对话体验」）在 `2026-08-04.md` 里出现两次，已手工去重
+- **修复**：`text_inbox.py` 新增 `_inbox_lock()`，用 `fcntl.flock(LOCK_EX | LOCK_NB)` 把整轮运行（discover → 处理 → 写 ledger → 移文件）串行化。原 `process_inbox()` 函数体改名 `_process_inbox()`，外层负责拿锁；拿不到就打印 `[LOCKED]` 返回 `(0,0,0)`，不抛异常，pipeline 汇总照常显示
+- **为什么用 flock 而不是 PID 文件**：内核在进程退出时自动释放。崩溃/被 kill 的运行不会留下永久堵死后续每一次运行的死锁 —— PID 文件方案的典型失败模式是几个月后才发现管道悄悄停摆
+- **锁文件位置**：`BASE_DIR/.text_inbox.lock`（本地磁盘，挨着它保护的 ledger），**不放** iCloud inbox 目录。flock 在同步路径上不可靠，且锁只需被本机进程看到。已加进 `.gitignore`
+- **`--dry-run` 不拿锁**：它不写 ledger、不写笔记、不建锁文件，所以既不需要锁，也不应该有能力挡住排在后面的真实运行（符合「dry-run 绝不写任何状态文件」规则）
+- **验证**：新增 `test_text_inbox_lock.py`（自包含脚本，无框架依赖，函数体 monkeypatch，不发网络请求也不碰真 vault）。四条断言全过：并发时第二个进程完全不执行函数体、SIGKILL 掉持锁进程后锁立刻可用、无竞争时正常拿放、dry-run 不被挡。已有 `test_text_inbox_skip.py` 仍通过（函数改名的回归点）
+
 ---
 
 ## Backlog
+
+- [ ] **流水线 A 也有同样的并发缺陷**：这次的锁只护 text inbox。音频那条（transcribe → refine，共用 `.refined_ledger.json`）两个进程同时跑同样会互相踩，只是这次没触发。修法同 C，把 `_inbox_lock()` 抽成共用工具即可（2026-08-06 Bear 决定先只修 C）
 
 - [ ] Chunk long audio before transcription (support recordings > 30 min)
 
