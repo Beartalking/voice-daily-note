@@ -111,6 +111,8 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 
 ## Backlog
 
+- [ ] **流水线 B 的排除机制只有「源头摘标签」一条路**（2026-08-13 踩到）：`share_to_social.py` 主流程里 Step 1 无条件 `write_extracted()` 覆盖 `sharing_output/01_extracted.md`，位置在 `--dry-run` 分支之前。所以手动编辑 `01_extracted.md` 删掉不想发的条目**不起作用**，下次跑会被重新扫出来覆盖回去；`--step generate` 又只生成不落库，补跑完整命令时 Step 1 照样重扫。当前唯一可靠的排除方式是去日记里摘掉 `#Share`。去重维度也只有「Content Vault 里已存在同名标题」，草稿被删掉后同一条会再次被抽出。若这个坑再犯，考虑加 `--skip-title` 参数，或让 Step 1 在 `01_extracted.md` 已存在且未加 `--force` 时跳过重写
+
 - [ ] **流水线 A 也有同样的并发缺陷**：这次的锁只护 text inbox。音频那条（transcribe → refine，共用 `.refined_ledger.json`）两个进程同时跑同样会互相踩，只是这次没触发。修法同 C，把 `_inbox_lock()` 抽成共用工具即可（2026-08-06 Bear 决定先只修 C）
 
 - [ ] Chunk long audio before transcription (support recordings > 30 min)
