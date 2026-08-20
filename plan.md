@@ -113,6 +113,8 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 
 - [ ] **流水线 B 的排除机制只有「源头摘标签」一条路**（2026-08-13 踩到）：`share_to_social.py` 主流程里 Step 1 无条件 `write_extracted()` 覆盖 `sharing_output/01_extracted.md`，位置在 `--dry-run` 分支之前。所以手动编辑 `01_extracted.md` 删掉不想发的条目**不起作用**，下次跑会被重新扫出来覆盖回去；`--step generate` 又只生成不落库，补跑完整命令时 Step 1 照样重扫。当前唯一可靠的排除方式是去日记里摘掉 `#Share`。去重维度也只有「Content Vault 里已存在同名标题」，草稿被删掉后同一条会再次被抽出。若这个坑再犯，考虑加 `--skip-title` 参数，或让 Step 1 在 `01_extracted.md` 已存在且未加 `--force` 时跳过重写
 
+  **2026-08-20 再犯一次**：这批 5 条生成后，Bear 在 Obsidian 里逐条审，把《深夜惊魂记》整个草稿文件删了（其余 4 条改文案 + `ready: true` 后正常发出）。删掉的那条 drafts 和 published 里都不在，而 2026-08-14 仍在 7 天窗口内，下次跑 B 会被重新抽出来重新生成。已提醒 Bear 回日记摘标签。触发条件已满足，`--skip-title` 可以排期了
+
 - [ ] **流水线 A 也有同样的并发缺陷**：这次的锁只护 text inbox。音频那条（transcribe → refine，共用 `.refined_ledger.json`）两个进程同时跑同样会互相踩，只是这次没触发。修法同 C，把 `_inbox_lock()` 抽成共用工具即可（2026-08-06 Bear 决定先只修 C）
 
 - [ ] Chunk long audio before transcription (support recordings > 30 min)
