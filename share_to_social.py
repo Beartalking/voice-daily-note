@@ -220,10 +220,29 @@ def _is_duplicate(new_title: str, processed_titles: set, processed_keywords: dic
     return False
 
 
+def _matches_skip(title: str, skip_titles: Optional[list]) -> bool:
+    """True if the title matches any --skip-title pattern.
+
+    Normalised substring match (same normalisation as dedup), so a fragment of
+    the title is enough. Patterns that normalise to nothing are ignored: an
+    empty pattern would otherwise match every title and silently drop the
+    whole batch.
+    """
+    if not skip_titles:
+        return False
+    normalized = _normalize_title(title)
+    for pattern in skip_titles:
+        norm_pattern = _normalize_title(pattern)
+        if norm_pattern and norm_pattern in normalized:
+            return True
+    return False
+
+
 def extract_share_entries_from_daily_notes(
     input_dir: Optional[str] = None,
     force: bool = False,
     days_back: int = 7,
+    skip_titles: Optional[list] = None,
 ) -> list[ShareEntry]:
     """Scan Obsidian Daily Notes directly for #Share entries, skipping already-processed ones."""
     base = Path(input_dir) if input_dir else DAILY_NOTES_BASE
@@ -260,6 +279,10 @@ def extract_share_entries_from_daily_notes(
         # Filter out entries whose titles are already processed
         new_entries = []
         for entry in entries:
+            # Explicit exclusion wins over everything, --force included.
+            if _matches_skip(entry.title, skip_titles):
+                print(f"  Skipped by --skip-title: {entry.title}  ({md_file.name})")
+                continue
             if _is_duplicate(entry.title, processed_titles, processed_keywords):
                 continue
             new_entries.append(entry)
@@ -679,6 +702,14 @@ def parse_args() -> argparse.Namespace:
         default=7,
         help="Number of days to look back for #Share entries (default: 7)",
     )
+    parser.add_argument(
+        "--skip-title",
+        action="append",
+        metavar="TITLE",
+        default=None,
+        help="Exclude any #Share entry whose title contains TITLE (case/punctuation "
+             "insensitive, partial titles work). Repeatable. Applies even with --force.",
+    )
     return parser.parse_args()
 
 
@@ -726,6 +757,7 @@ def main():
         input_dir=args.input_dir,
         force=args.force,
         days_back=args.days,
+        skip_titles=args.skip_title,
     )
     if not entries:
         print("  No new #Share entries found. Nothing to do.")
