@@ -8,10 +8,13 @@ One-command pipeline that converts voice memos into polished daily Markdown note
 Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
                                         ↓ (#Convo entries)
                                    auto-append structured summary
-                                        ↓ (#Share entries)
-                              Bear Content Vault/Social Posts/drafts/manual/YYYY-MM/
-                              (Twitter CN only, reads Daily Notes directly)
+                                        ↓ (#Book / #Movie entries)
+                                   bookshelf_sync → 40_Books / 41_Movies
 ```
+
+`#Share` 条目**不再由本仓处理**。2026-08-24 起走
+`content-publisher` 的 `social_publisher.py import-share`，见下方「流水线 B 搬去
+content-publisher」。`share_to_social.py` 还在仓里但不要再跑。
 
 ---
 
@@ -117,6 +120,11 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 - **验证**：新增 `test_text_inbox_lock.py`（自包含脚本，无框架依赖，函数体 monkeypatch，不发网络请求也不碰真 vault）。四条断言全过：并发时第二个进程完全不执行函数体、SIGKILL 掉持锁进程后锁立刻可用、无竞争时正常拿放、dry-run 不被挡。已有 `test_text_inbox_skip.py` 仍通过（函数改名的回归点）
 
 ### 流水线 B：`--skip-title` 排除机制 (v2.4, 2026-08-24)
+
+> **当天下午即随流水线 B 搬去 content-publisher，本节记录的是已退役脚本的历史。**
+> 机制本身完整搬过去了，现在是 `import-share --skip-title`。下面的分析仍然成立，
+> 尤其「删草稿 ≠ 排除」那条在新实现里同样适用。
+
 - **背景**：排除一条不想发的 `#Share` 条目，此前唯一可靠的方式是回日记摘标签。踩了两次（2026-08-13、2026-08-20 的《深夜惊魂记》）后落地
 - **为什么原来的两条路都不通**（现状确认，未改）：Step 1 无条件 `write_extracted()` 覆盖 `sharing_output/01_extracted.md`，且位置在 `--dry-run` 分支之前 → 手动编辑 `01_extracted.md` 删条目不起作用；去重维度只有「Content Vault drafts + published 里存在同名标题」→ **删草稿 ≠ 排除**，只要还在回溯窗口内就会被重抽
 - **新增 `--skip-title TITLE`**：`action="append"` 可重复。命中即在提取阶段丢弃并打印 `Skipped by --skip-title: <标题>`，不静默
@@ -125,6 +133,29 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 - **排除优先于 `--force`**：`--force` 只关去重，显式排除是更强的信号，两者叠加时排除仍生效
 - **没有选「Step 1 在 `01_extracted.md` 已存在时跳过重写」那条路**：那会把一个中间产物变成隐式状态文件，和「dry-run 绝不写状态文件」的既定规矩气质冲突，也留下一个删了就复活的坑
 - **验证**：新增 `test_share_skip_title.py`（自包含脚本，无框架依赖，fixture 日记在临时目录，monkeypatch 掉 `_collect_processed_titles`，不发网络请求也不碰真 vault）。五条断言全过：命中即排除且其余条目不受影响、片段匹配、大小写/标点不敏感、`--force` 下仍生效、不传参数时行为不变。真 vault 上 `--dry-run --days 14` 复现了《深夜惊魂记》被重抽，加 `--skip-title 深夜惊魂` 后消失；`test_text_inbox_skip.py` / `test_text_inbox_lock.py` 无回归
+
+### 流水线 B 搬去 content-publisher (2026-08-24)
+
+`#Share` 的提取和改写不再由本仓负责，改由 `content-publisher` 的
+`social_publisher.py import-share` 承担。
+
+**为什么搬**：`share_to_social.py` 里有一份写死的 130 行 `SOCIAL_SYSTEM_PROMPT`，
+2 月手抄进去之后再没更新，而且**从来不读 `~/.claude/skills/writing/SKILL.md`**。
+content-publisher 的 `voice.py` 是运行时读的。结果是改 writing skill 只有英文
+LinkedIn 跟着变，中文 #Share 帖子一直在用 2 月的冻结副本，两份声音规格已经分叉。
+新实现读 `voice.load_chinese_voice_baseline()`，跟英文那条路同源。
+
+**搬过去时修掉的两处**（本仓的 `share_to_social.py` 仍有）：
+- 不跳过 voice-capture 折叠归档块。归档块里的已路由命令自带 `**标签**` 行，会被当成
+  真条目，就是 v2.2 修 bookshelf_sync 的那个 bug，本仓的流水线 B 从来没加这道防护
+- 条目尾部的 `---` 分隔符被当成正文喂给模型（`maxsplit=1` 只切开头那个）
+
+**对拍**：真 vault 上 `--dry-run --days 14`，新旧两条路抓到完全相同的 3 条，去重基数同为 843。
+
+**`share_to_social.py` 暂未删除**，但**不要再跑了**，跑了会产生重复草稿而且用的是旧声音。
+它不在任何 launchd 任务里（一直是手动跑的），所以没有自动重复的风险。
+等 Bear 用新命令跑过一轮确认没问题，再决定删除还是留档。
+当天早些时候给它加的 `--skip-title`（v2.4）已一并搬到新实现里。
 
 ---
 

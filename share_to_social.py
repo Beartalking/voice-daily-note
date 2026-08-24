@@ -746,7 +746,34 @@ def _collect_processed_titles():
     return processed, keywords
 
 
+_RETIRED_NOTICE = """\
+流水线 B 已于 2026-08-24 退役，这个脚本不再使用。
+
+改用 content-publisher：
+
+    cd /Users/bearliu/Desktop/ClaudeCode/content-publisher
+    python3 social_publisher.py import-share --dry-run
+    python3 social_publisher.py import-share
+
+为什么搬：这里的 SOCIAL_SYSTEM_PROMPT 是 2026-02 手抄进来的 130 行副本，从来不读
+~/.claude/skills/writing/SKILL.md。改 writing skill 只有英文 LinkedIn 跟着变，中文
+#Share 帖子一直用冻结副本，两份声音规格已经分叉。新实现在生成时读 skill。
+
+新实现还修了这里的两个缺陷：不跳过 voice-capture 折叠归档块，以及把条目尾部的 ---
+分隔符当正文喂给模型。
+
+现在跑这个脚本会产生重复草稿，而且用的是旧声音。文件保留仅供查阅。
+详见 plan.md「流水线 B 搬去 content-publisher」。
+"""
+
+
 def main():
+    # A comment at the top of the file does not stop anyone running it out of
+    # habit, so the refusal is executable. Kept ahead of parse_args so no
+    # combination of flags gets past it, and ahead of any vault read.
+    print(_RETIRED_NOTICE)
+    raise SystemExit(2)
+
     args = parse_args()
     output_dir = SHARING_OUTPUT_DIR
 
