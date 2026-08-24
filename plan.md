@@ -95,7 +95,7 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 - **Bug**：配图完全丢失。图片 markdown 混在正文里喂给 Claude，改写时被吃掉；`save_to_content_vault()` 又把 frontmatter 的 `images:` 写死为空
 - `ShareEntry` / `SocialPost` 新增 `images` 字段
 - 新增 `_extract_images_from_body()`：抠出 `![[...]]` 与本地 `![](...)`，按 Obsidian `attachmentFolderPath`（`./99_Assets`）解析绝对路径，兜底按文件名全库搜；同时把图片 markdown 从正文剥掉，**正文只留纯文字给 Claude 改写**
-- 存 vault 时写进 frontmatter `images:` 块。跨 vault 必须用绝对路径，指向日记那侧的 `99_Assets` —— 发布前别移走或清理那些附件，否则路径断掉
+- 存 vault 时写进 frontmatter `images:` 块。跨 vault 必须用绝对路径，指向日记那侧的 `99_Assets`，发布前别移走或清理那些附件，否则路径断掉
 - 下游 content-publisher 的 `_resolve_image` 负责发布时上传 Cloudinary
 - 验证：3 条带图条目图片全解析到真实文件（含一条 2 张），正文无残留，跑两次幂等无重复
 - *（本条 2026-08-24 补记：功能 2026-07-22 就上线了，SKILL.md 当时同步了，plan.md 漏记）*
@@ -121,7 +121,7 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 - **为什么原来的两条路都不通**（现状确认，未改）：Step 1 无条件 `write_extracted()` 覆盖 `sharing_output/01_extracted.md`，且位置在 `--dry-run` 分支之前 → 手动编辑 `01_extracted.md` 删条目不起作用；去重维度只有「Content Vault drafts + published 里存在同名标题」→ **删草稿 ≠ 排除**，只要还在回溯窗口内就会被重抽
 - **新增 `--skip-title TITLE`**：`action="append"` 可重复。命中即在提取阶段丢弃并打印 `Skipped by --skip-title: <标题>`，不静默
 - 匹配走 `_matches_skip()`，复用 `_normalize_title()` 做归一化子串匹配 → 大小写、标点、空格不敏感，**打片段就够**（`深夜惊魂` 命中《深夜惊魂记》）
-- 归一化后为空的 pattern 直接忽略。否则 `--skip-title ""` 会匹配所有标题，整批静默清空 —— 排除机制自己变成新的丢内容事故
+- 归一化后为空的 pattern 直接忽略。否则 `--skip-title ""` 会匹配所有标题，整批静默清空，排除机制自己变成新的丢内容事故
 - **排除优先于 `--force`**：`--force` 只关去重，显式排除是更强的信号，两者叠加时排除仍生效
 - **没有选「Step 1 在 `01_extracted.md` 已存在时跳过重写」那条路**：那会把一个中间产物变成隐式状态文件，和「dry-run 绝不写状态文件」的既定规矩气质冲突，也留下一个删了就复活的坑
 - **验证**：新增 `test_share_skip_title.py`（自包含脚本，无框架依赖，fixture 日记在临时目录，monkeypatch 掉 `_collect_processed_titles`，不发网络请求也不碰真 vault）。五条断言全过：命中即排除且其余条目不受影响、片段匹配、大小写/标点不敏感、`--force` 下仍生效、不传参数时行为不变。真 vault 上 `--dry-run --days 14` 复现了《深夜惊魂记》被重抽，加 `--skip-title 深夜惊魂` 后消失；`test_text_inbox_skip.py` / `test_text_inbox_lock.py` 无回归
@@ -137,3 +137,7 @@ Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
 - [ ] Post-refinement character count validation with auto-retry if content shrinks > 15%
 
 - [ ] iPhone Voice Memo `.m4a` filename pattern support（当前需手动重命名为 `YYYYMMDD-N.m4a` 格式）
+
+- [ ] **清死代码**（2026-08-24 开工检查发现）：`share_pipeline.py`（v1.2 的轻量版）和 `share_to_linkedin.py` 早在 v1.3 就被 `share_to_social.py` 取代，两个文件仍留在仓里；`README.md:147` 还把 `share_pipeline.py` 列为「从每日笔记存到 Content Vault（轻量版）」，会误导下一个来读的人（包括未来的 Claude）
+
+- [ ] **两个 launchd 启动脚本没纳管**（2026-08-24 开工检查发现）：`run_text_inbox.sh`、`run_bookshelf_sync.sh` 一直是 untracked，也不在 `.gitignore` 里。换机器或重装就丢，而流水线 C / D 的定时运行全靠它们

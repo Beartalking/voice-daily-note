@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Self-contained regression check for 流水线 B 的 --skip-title 排除机制.
 
-This repo has no test suite and no test framework installed — so this is a
+This repo has no test suite and no test framework installed, so this is a
 plain script, not a pytest file. Run it directly:
 
     python3 test_share_skip_title.py
@@ -15,12 +15,12 @@ remove the tag. Editing sharing_output/01_extracted.md did nothing (Step 1
 overwrites it unconditionally), and deleting the generated draft did nothing
 either (dedup only looks for titles that still exist in the Content Vault),
 so any entry still inside the look-back window came straight back on the next
-run. Bear hit this twice — 2026-08-13 and again 2026-08-20 (《深夜惊魂记》).
+run. Bear hit this twice: 2026-08-13, and again on 2026-08-20.
 
 Nothing real is touched: the daily notes are fixtures in a temp directory
 (passed via input_dir) and _collect_processed_titles is monkeypatched to an
 empty result, so the real Obsidian vault and Content Vault are never read.
-No network call is made — extraction runs entirely before the Claude step.
+No network call is made: extraction runs entirely before the Claude step.
 """
 from __future__ import annotations
 
@@ -38,22 +38,22 @@ import share_to_social
 DAYS_BACK = 3650
 
 NOTE = """---
-date: 2026-08-14
+date: 2026-01-15
 ---
 
-## 第二次美术馆人体速写练习
-**场景**：个人生活与艺术学习
+## 周六早上的长跑
+**场景**：日常
 **标签**： #Diary #Share
 
 ---
-今天是第二次到美术馆画人体速写，先画腰部会容易一些。
+沿着海边跑了八公里，比上周快了两分钟。
 
-## 深夜惊魂记
-**场景**：生活记录
+## 雨夜断电记
+**场景**：日常
 **标签**： #Diary #Share
 
 ---
-晚上一个人看恐怖片，阳台的门突然自己打开了。
+半夜停电，翻箱倒柜找蜡烛，最后靠手机手电筒撑到天亮。
 
 ## Obsidian vs Notion
 **场景**：工具思考
@@ -65,9 +65,9 @@ date: 2026-08-14
 
 
 def _make_vault(base: Path) -> None:
-    note_dir = base / "2026" / "08"
+    note_dir = base / "2026" / "01"
     note_dir.mkdir(parents=True)
-    (note_dir / "2026-08-14.md").write_text(NOTE, encoding="utf-8")
+    (note_dir / "2026-01-15.md").write_text(NOTE, encoding="utf-8")
 
 
 def _extract(base: Path, skip_titles=None, force: bool = False):
@@ -92,18 +92,18 @@ def test_skip_title_excludes_that_entry_and_keeps_the_rest():
         baseline, _ = _extract(tmp_dir)
         titles = [e.title for e in baseline]
         assert titles == [
-            "第二次美术馆人体速写练习",
-            "深夜惊魂记",
+            "周六早上的长跑",
+            "雨夜断电记",
             "Obsidian vs Notion",
         ], f"fixture should yield 3 entries, got {titles}"
 
-        entries, out = _extract(tmp_dir, skip_titles=["深夜惊魂记"])
+        entries, out = _extract(tmp_dir, skip_titles=["雨夜断电记"])
         titles = [e.title for e in entries]
         assert titles == [
-            "第二次美术馆人体速写练习",
+            "周六早上的长跑",
             "Obsidian vs Notion",
         ], f"skipped entry should be gone, got {titles}"
-        assert "深夜惊魂记" in out, "the skip should be reported on stdout, not silent"
+        assert "雨夜断电记" in out, "the skip should be reported on stdout, not silent"
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -114,9 +114,9 @@ def test_skip_title_matches_a_partial_title():
     try:
         _make_vault(tmp_dir)
 
-        entries, _ = _extract(tmp_dir, skip_titles=["深夜惊魂"])
+        entries, _ = _extract(tmp_dir, skip_titles=["雨夜断电"])
         titles = [e.title for e in entries]
-        assert "深夜惊魂记" not in titles, f"partial title should match, got {titles}"
+        assert "雨夜断电记" not in titles, f"partial title should match, got {titles}"
         assert len(titles) == 2, f"only the one entry should be dropped, got {titles}"
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -142,9 +142,9 @@ def test_skip_title_still_applies_under_force():
     try:
         _make_vault(tmp_dir)
 
-        entries, _ = _extract(tmp_dir, skip_titles=["深夜惊魂记"], force=True)
+        entries, _ = _extract(tmp_dir, skip_titles=["雨夜断电记"], force=True)
         titles = [e.title for e in entries]
-        assert "深夜惊魂记" not in titles, f"--force must not defeat --skip-title, got {titles}"
+        assert "雨夜断电记" not in titles, f"--force must not defeat --skip-title, got {titles}"
         assert len(titles) == 2, f"force should keep the other entries, got {titles}"
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
