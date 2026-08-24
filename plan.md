@@ -2,7 +2,9 @@
 
 ## Overview
 
-One-command pipeline that converts voice memos into polished daily Markdown notes, then generates Twitter CN social posts from selected entries.
+One-command pipeline that turns voice memos and captured text into polished daily
+Markdown notes in Obsidian, and syncs tagged reading and viewing notes onto the
+bookshelf. Publishing lives elsewhere: see the note on pipeline B below.
 
 ```
 Recording/*.wav → transcripts/*.txt → refine → Obsidian Daily Notes
@@ -157,6 +159,45 @@ LinkedIn 跟着变，中文 #Share 帖子一直在用 2 月的冻结副本，两
 等 Bear 用新命令跑过一轮确认没问题，再决定删除还是留档。
 当天早些时候给它加的 `--skip-title`（v2.4）已一并搬到新实现里。
 
+### launchd 启动脚本纳管 + 流水线 C / D 归属评估 (2026-08-24)
+
+**纳管**：`run_text_inbox.sh`（09:30，流水线 C）和 `run_bookshelf_sync.sh`（09:40，流水线 D）
+此前一直是 untracked，也不在 `.gitignore` 里。每天靠它们跑，换机器或误删就没了，
+而且没有任何地方记着它们的内容。已入仓。
+
+这两个脚本的注释里存着两条硬教训，本身就值得进版本控制：
+
+- `run_bookshelf_sync.sh` 完整记录了 `EX_CONFIG(78)` 那次静默死亡（日志放 Desktop 树下，
+  文件会进入 xpcproxy 拒绝接受的每文件状态，job 在 spawn 前就被拒，什么都写不出来。
+  这个任务因此从 2026-07-27 死到 08-03）。所以日志一律放 `~/Library/Logs/voice-daily-note/`
+- 同一个脚本记着自动建档的撞名风险（中文标题可能撞同名英文作品，例：怒呛人生 → The Bear），
+  并在有新建档时发通知提醒人工核对
+
+两个脚本都用 `rc=$?` 在紧跟命令之后捕获退出码，失败时发 macOS 通知。
+launchd 会吞掉静默失败，不发通知就等于没人知道。
+
+**归属评估结论：流水线 C 和 D 都留在本仓，不搬。**
+
+评估起因是流水线 B 刚搬去 content-publisher，Bear 问 C / D 是否也该搬。判据是
+content-publisher 管的是「内容出门」（Content Vault → Buffer / Hashnode / Substack），
+B 之所以该搬是因为它跨出去了。**C 和 D 全程在 Bear Vault 内部，一个字都不发出去，
+所以两条都不属于 content-publisher。**
+
+- **C 留下的理由很硬**：它不是独立脚本，是 `pipeline.py` 的 Step 2.6；并且和 `refine.py`
+  共用 `daily_note_writer`（全仓只有这两个文件 import 它）。A 和 C 是同一件事的两个入口，
+  进来的一个是录音一个是文字，出口都是同一天那篇日记，走同一个写入函数。拆它要把
+  `daily_note_writer` 和 `config` 劈成两半跨仓 import，零收益
+- **D 其实跟本仓关系很浅**：不在 `pipeline.py` 里，靠自己的 launchd 独立跑；从 `config`
+  只拿了六个通用 API 管道常量，没有任何项目专属耦合；`VAULT_ROOT` / tracker 全自己定义；
+  下游 `subprocess` 调 `reader-library/add_book.py` 和 `movie-notes/add_movie.py`。
+  真正的引力在那两个仓。但**现状代价接近于零**（独立跑、独立记账、不拖累别人），
+  搬它是整洁性收益不是止血，Bear 决定维持现状
+- 仓名叫 "voice" 却在处理文字（流水线 C）和书影（流水线 D），这是**命名问题不是归属问题**，
+  不作为搬迁理由
+
+**未做**：两个 launchd plist 本身（`~/Library/LaunchAgents/com.bear.voice-*.plist`）仍未入仓。
+调度时间和 label 已写在 wrapper 脚本的注释里，所以知识没丢，但重建环境还是要手写 plist。
+
 ---
 
 ## Backlog
@@ -171,4 +212,4 @@ LinkedIn 跟着变，中文 #Share 帖子一直在用 2 月的冻结副本，两
 
 - [ ] **清死代码**（2026-08-24 开工检查发现）：`share_pipeline.py`（v1.2 的轻量版）和 `share_to_linkedin.py` 早在 v1.3 就被 `share_to_social.py` 取代，两个文件仍留在仓里；`README.md:147` 还把 `share_pipeline.py` 列为「从每日笔记存到 Content Vault（轻量版）」，会误导下一个来读的人（包括未来的 Claude）
 
-- [ ] **两个 launchd 启动脚本没纳管**（2026-08-24 开工检查发现）：`run_text_inbox.sh`、`run_bookshelf_sync.sh` 一直是 untracked，也不在 `.gitignore` 里。换机器或重装就丢，而流水线 C / D 的定时运行全靠它们
+- [x] ~~**两个 launchd 启动脚本没纳管**~~（2026-08-24 当天纳管）：见下方「launchd 启动脚本纳管」
