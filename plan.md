@@ -202,6 +202,8 @@ B 之所以该搬是因为它跨出去了。**C 和 D 全程在 Bear Vault 内�
 
 ## Backlog
 
+- **⏳ 待 Bear 定（2026-09-27 W39 周复盘分发）：精修要不要改成更保留原始语意。** Bear 2026-09-25 语音日记：Mike 说他近期推文 AI 味太重，他想通了「原始语音的直接转录……从意图的角度来说，这应该是最精准的」，打算「重新改一下语音的转录和整理的要求，让它尽量保持原始的语意，而在整理发布那个过程呢，再用 AI 来做」。Typeless 继续用于和 AI 交流、下指令、回复他人。**只是意向，未定改法**。原文在 `10_Daily/2026/09/2026-09-25.md`「关于语音记录和AI工具的使用反思」
+
 - [ ] **流水线 A 也有同样的并发缺陷**：这次的锁只护 text inbox。音频那条（transcribe → refine，共用 `.refined_ledger.json`）两个进程同时跑同样会互相踩，只是这次没触发。修法同 C，把 `_inbox_lock()` 抽成共用工具即可（2026-08-06 Bear 决定先只修 C）
 
 - [ ] Chunk long audio before transcription (support recordings > 30 min)
