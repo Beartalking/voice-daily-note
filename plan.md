@@ -22,9 +22,18 @@ content-publisher」。`share_to_social.py` 还在仓里但不要再跑。
 
 ## Completed
 
+### 流水线 A 每日定时（2026-10-06）
+- `run_capture.sh` + `~/Library/LaunchAgents/com.bear.voice-capture.plist`，每天 **09:00** 跑 `pipeline.py`（Plaud 08:30 之后、text inbox 09:30 之前）。只自动化 `/capture` 的第 1 段；voice-capture 分诊要 Claude + Reminders MCP，仍由 Bear 手动 `/capture` 触发（那时音频已清空，第 1 段自然跳过）
+- **并发锁**：Backlog 里那条「流水线 A 也有同样的并发缺陷」随之修掉。flock 抽成 `run_lock.py` 的 `exclusive_lock()`，`text_inbox._inbox_lock()` 改为调它；`pipeline.py` 整轮持 `.pipeline.lock`，抢不到打印 `[LOCKED]` 并 exit 0；`--dry-run` 不拿锁。`plaud_sync.py` 里还有第三份同样的 flock 代码（7be41b0 提交），没动，以后可以顺手改成调 `run_lock`
+- **退出码**：`pipeline.py` 以前恒 exit 0，现在 transcribe / refine / text inbox 任一失败即 exit 1，wrapper 靠它弹失败通知
+- **通知**三种：失败（Basso）、有录音被写进日记时提醒去跑 `/capture` 分诊（Glass）、有文件名认不出时间戳被静默跳过（Basso，对应全下划线文件名那个坑）
+- wrapper 的 PATH 补了 `/opt/homebrew/bin`：whisper 兜底要调 ffmpeg，launchd 默认 PATH 里没有
+- 日志：`~/Library/Logs/voice-daily-note/capture.log`（业务）+ `capture.out.log`（launchd stdio）
+- 验证：新增 `test_pipeline_lock.py`（锁竞争、SIGKILL 不留死锁、dry-run 不被挡、退出码透传）；两个旧测试无回归；临时 launchd 探针确认 Buzz CLI 在 launchd 下能转写（合成中文语音 12 秒出稿，探针已卸载）；`launchctl kickstart` 端到端跑通，exit 0，无写入
+
 ### Plaud 同步（2026-10-06）
 - `plaud_sync.py` + `run_plaud_sync.sh` + `~/Library/LaunchAgents/com.bear.voice-plaud-sync.plist`（每天 08:30）
-- 分流看 `plaud file` 的 `transcript:` 字段：unavailable → 下音频转 m4a 进 `~/Desktop/capture/PLAUD_YYYYMMDD_HHMMSS_<名称>.m4a`（pipeline A 照常手动跑）；available → transcript + `summary --all` 写进 `23_Meetings/YYYY-MM-DD - Plaud - <名称>.md`
+- 分流看 `plaud file` 的 `transcript:` 字段：unavailable → 下音频转 m4a 进 `~/Desktop/capture/PLAUD_YYYYMMDD_HHMMSS_<名称>.m4a`（09:00 起由 pipeline A 的定时任务接走，见上节）；available → transcript + `summary --all` 写进 `23_Meetings/YYYY-MM-DD - Plaud - <名称>.md`
 - 只处理本地日期早于今天的录音；`.plaud_sync_ledger.json` 去重；回看 14 天兜住关机漏跑；exit 2 = Plaud 登录过期，弹通知
 - 实测出来的坑：音频是 Ogg Opus（pipeline A 不认，用 afconvert 转）；下载链接签名只有 3600 秒，CLI 却说 24 小时；`start_at` 是 UTC；没 transcript 时 `plaud transcript` 也 exit 0；`recent -d` 上限 365（seed 改用 `files` 分页）
 - 首跑前 `--seed` 把账户里已有的 10 条（测试 + Plaud 示例）全部记为已处理
@@ -217,7 +226,7 @@ B 之所以该搬是因为它跨出去了。**C 和 D 全程在 Bear Vault 内�
 
 - **⏳ 待 Bear 定（2026-09-27 W39 周复盘分发）：精修要不要改成更保留原始语意。** Bear 2026-09-25 语音日记：Mike 说他近期推文 AI 味太重，他想通了「原始语音的直接转录……从意图的角度来说，这应该是最精准的」，打算「重新改一下语音的转录和整理的要求，让它尽量保持原始的语意，而在整理发布那个过程呢，再用 AI 来做」。Typeless 继续用于和 AI 交流、下指令、回复他人。**只是意向，未定改法**。原文在 `10_Daily/2026/09/2026-09-25.md`「关于语音记录和AI工具的使用反思」
 
-- [ ] **流水线 A 也有同样的并发缺陷**：这次的锁只护 text inbox。音频那条（transcribe → refine，共用 `.refined_ledger.json`）两个进程同时跑同样会互相踩，只是这次没触发。修法同 C，把 `_inbox_lock()` 抽成共用工具即可（2026-08-06 Bear 决定先只修 C）
+- [x] ~~**流水线 A 也有同样的并发缺陷**~~（2026-10-06 随定时任务一起修掉，见「流水线 A 每日定时」）：这次的锁只护 text inbox。音频那条（transcribe → refine，共用 `.refined_ledger.json`）两个进程同时跑同样会互相踩，只是这次没触发。修法同 C，把 `_inbox_lock()` 抽成共用工具即可（2026-08-06 Bear 决定先只修 C）
 
 - [ ] Chunk long audio before transcription (support recordings > 30 min)
 

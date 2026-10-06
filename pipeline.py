@@ -4,13 +4,22 @@
 from __future__ import annotations
 
 import shutil
+import sys
 from collections import defaultdict
 from datetime import date, timedelta
 from typing import Optional
 
-from config import ARCHIVE_DIR, ARCHIVE_RETENTION_DAYS, RECORDING_DIR, ensure_dirs, parse_args
+from config import (
+    ARCHIVE_DIR,
+    ARCHIVE_RETENTION_DAYS,
+    PIPELINE_LOCK,
+    RECORDING_DIR,
+    ensure_dirs,
+    parse_args,
+)
 from convo_summary import summarize_convo_all
 from refine import refine_all
+from run_lock import exclusive_lock
 from text_inbox import process_inbox
 from transcribe import discover_audio_files, transcribe_all
 
@@ -103,13 +112,37 @@ def print_summary(
     print("=" * 50)
 
 
-def main():
+def main() -> int:
+    """Run the pipeline once. Returns the process exit code.
+
+    0 = clean run (or skipped because another run holds the lock), 1 = at least
+    one transcribe / refine / text-inbox failure. launchd's wrapper
+    (run_capture.sh) relies on this to raise a notification; before 2026-10-06
+    the pipeline always exited 0, which was fine only while a human read the
+    summary.
+    """
     args = parse_args()
     ensure_dirs()
 
     print("Voice Daily Note Pipeline")
     print("-" * 40)
 
+    if args.dry_run:
+        # A dry run writes no ledger, note or lock file, so it neither needs
+        # the lock nor should be able to block the real run behind it.
+        return _run(args)
+
+    # launchd (09:00) and a manual /capture both read and write the refined
+    # ledger; serialise whole runs so the same transcript is never appended
+    # to a daily note twice (the 2026-08-06 pipeline C incident, audio side).
+    with exclusive_lock(PIPELINE_LOCK) as acquired:
+        if not acquired:
+            print("[LOCKED] another pipeline run is in progress — skipping this run")
+            return 0
+        return _run(args)
+
+
+def _run(args) -> int:
     # Track results
     audio_files = []
     t_ok = t_skip = t_fail = 0
@@ -126,7 +159,7 @@ def main():
         if not audio_files:
             print("  No audio files found in Recording/")
             if args.step == "transcribe":
-                return
+                return 0
         else:
             dates = sorted(set(af.date for af in audio_files))
             print(f"  Found {len(audio_files)} files across {len(dates)} day(s)")
@@ -199,7 +232,8 @@ def main():
         archived, deleted,
         ti_ok, ti_skip, ti_fail,
     )
+    return 1 if (t_fail or r_fail or ti_fail) else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

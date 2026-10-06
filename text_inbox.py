@@ -13,9 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import fcntl
 import json
-import os
 import re
 import shutil
 import time
@@ -37,6 +35,7 @@ from config import (
     get_api_key,
 )
 from daily_note_writer import get_daily_note_path, write_daily_note
+from run_lock import exclusive_lock
 from text_inbox_prompt import SYSTEM_PROMPT
 
 PROCESSED_DIR = TEXT_INBOX_DIR / "processed"
@@ -245,21 +244,10 @@ def _inbox_lock():
     killed run cannot leave a stale lock that blocks every later run.
 
     Yields True when the lock was acquired, False when another run holds it.
+    The flock itself lives in run_lock.py, shared with pipeline A.
     """
-    TEXT_INBOX_LOCK.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(TEXT_INBOX_LOCK), os.O_RDWR | os.O_CREAT, 0o644)
-    try:
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            yield False
-            return
-        try:
-            yield True
-        finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-    finally:
-        os.close(fd)
+    with exclusive_lock(TEXT_INBOX_LOCK) as acquired:
+        yield acquired
 
 
 def process_inbox(force=False, dry_run=False):

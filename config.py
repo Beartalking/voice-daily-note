@@ -43,6 +43,11 @@ TEXT_INBOX_LEDGER = BASE_DIR / ".text_inbox_ledger.json"
 # this machine.
 TEXT_INBOX_LOCK = BASE_DIR / ".text_inbox.lock"
 
+# Pipeline A (audio) lock. launchd runs pipeline.py daily at 09:00 and Bear still
+# runs /capture by hand; both read and write .refined_ledger.json, so the two
+# must never interleave. Local disk, same reasoning as TEXT_INBOX_LOCK.
+PIPELINE_LOCK = BASE_DIR / ".pipeline.lock"
+
 # ── Plaud sync ───────────────────────────────────────────────────────
 # Solo dictation (no transcript in Plaud) lands in RECORDING_DIR for pipeline A;
 # conversations (Plaud transcript exists) go straight to the meetings folder.
