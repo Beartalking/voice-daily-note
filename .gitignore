@@ -12,6 +12,9 @@ logs/
 
 # Concurrency lock (recreated per run; the ledger it guards stays tracked)
 .text_inbox.lock
+.plaud_sync.lock
+# Plaud ledger stays local: its paths carry meeting titles (client names), repo is public
+.plaud_sync_ledger.json
 
 # Sharing pipeline (input/output)
 sharing_input/

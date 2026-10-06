@@ -22,6 +22,14 @@ content-publisher」。`share_to_social.py` 还在仓里但不要再跑。
 
 ## Completed
 
+### Plaud 同步（2026-10-06）
+- `plaud_sync.py` + `run_plaud_sync.sh` + `~/Library/LaunchAgents/com.bear.voice-plaud-sync.plist`（每天 08:30）
+- 分流看 `plaud file` 的 `transcript:` 字段：unavailable → 下音频转 m4a 进 `~/Desktop/capture/PLAUD_YYYYMMDD_HHMMSS_<名称>.m4a`（pipeline A 照常手动跑）；available → transcript + `summary --all` 写进 `23_Meetings/YYYY-MM-DD - Plaud - <名称>.md`
+- 只处理本地日期早于今天的录音；`.plaud_sync_ledger.json` 去重；回看 14 天兜住关机漏跑；exit 2 = Plaud 登录过期，弹通知
+- 实测出来的坑：音频是 Ogg Opus（pipeline A 不认，用 afconvert 转）；下载链接签名只有 3600 秒，CLI 却说 24 小时；`start_at` 是 UTC；没 transcript 时 `plaud transcript` 也 exit 0；`recent -d` 上限 365（seed 改用 `files` 分页）
+- 首跑前 `--seed` 把账户里已有的 10 条（测试 + Plaud 示例）全部记为已处理
+- 前提：Plaud App 关掉自动转录，否则口述也会有 transcript，全部走会议路径
+
 ### Core Pipeline (v1.0)
 - `config.py` — constants, CLI argument parsing, `.env` support
 - `transcribe.py` — Buzz CLI primary + whisper Python fallback, dual filename pattern support
@@ -201,6 +209,11 @@ B 之所以该搬是因为它跨出去了。**C 和 D 全程在 Bear Vault 内�
 ---
 
 ## Backlog
+
+- [ ] **Plaud 同步首次定时运行待验收（2026-10-07 08:30）**：看 `~/Library/Logs/voice-daily-note/plaud_sync.log` 有没有按点跑、exit 0。顺带验两件只能靠真实使用确认的事：
+  1. 录音笔录完**不开手机 App**，录音会不会自己到云端（目前推断要开 App 才上传，未实测）
+  2. exit 2（登录过期）只用假 plaud 测过，真过期时看通知有没有弹
+- 注：2026-10-06 另装了 Plaud MCP（`npx @plaud-ai/mcp install`），非交互跑导致 Claude Desktop / Code / Codex / Cursor 全被配置、7 个 `plaud-*` skill 装进 `~/.claude/skills/`。MCP 管对话里临时查录音，每日拉取与分流仍归 `plaud_sync.py`，两者不冲突。Codex / Cursor 那两处 Bear 用不上可撤
 
 - **⏳ 待 Bear 定（2026-09-27 W39 周复盘分发）：精修要不要改成更保留原始语意。** Bear 2026-09-25 语音日记：Mike 说他近期推文 AI 味太重，他想通了「原始语音的直接转录……从意图的角度来说，这应该是最精准的」，打算「重新改一下语音的转录和整理的要求，让它尽量保持原始的语意，而在整理发布那个过程呢，再用 AI 来做」。Typeless 继续用于和 AI 交流、下指令、回复他人。**只是意向，未定改法**。原文在 `10_Daily/2026/09/2026-09-25.md`「关于语音记录和AI工具的使用反思」
 

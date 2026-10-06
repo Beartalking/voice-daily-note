@@ -43,6 +43,16 @@ TEXT_INBOX_LEDGER = BASE_DIR / ".text_inbox_ledger.json"
 # this machine.
 TEXT_INBOX_LOCK = BASE_DIR / ".text_inbox.lock"
 
+# ── Plaud sync ───────────────────────────────────────────────────────
+# Solo dictation (no transcript in Plaud) lands in RECORDING_DIR for pipeline A;
+# conversations (Plaud transcript exists) go straight to the meetings folder.
+PLAUD_MEETINGS_DIR = Path(
+    "/Users/bearliu/Library/Mobile Documents/iCloud~md~obsidian/Documents/Bear Vault/23_Meetings"
+)
+PLAUD_LEDGER = BASE_DIR / ".plaud_sync_ledger.json"
+PLAUD_LOCK = BASE_DIR / ".plaud_sync.lock"
+PLAUD_LOOKBACK_DAYS = 14  # covers days the Mac was off when launchd fired
+
 # ── Transcription ────────────────────────────────────────────────────
 BUZZ_CLI = "/Applications/Buzz.app/Contents/MacOS/Buzz"
 WHISPER_MODEL_SIZE = "medium"
