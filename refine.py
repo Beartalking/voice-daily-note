@@ -38,6 +38,18 @@ def _load_ledger():
     return {}
 
 
+def load_refined_ledger():
+    # type: () -> dict
+    """Public read of the refine ledger ({date: [transcript filename, ...]})."""
+    return _load_ledger()
+
+
+def is_blank_transcript(path):
+    # type: (Path) -> bool
+    """True for a transcript with nothing in it; refine skips these."""
+    return not _read_text(path).strip()
+
+
 def _save_ledger(ledger):
     # type: (dict) -> None
     REFINED_LEDGER.write_text(json.dumps(ledger, indent=2, ensure_ascii=False), encoding="utf-8")

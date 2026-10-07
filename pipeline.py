@@ -18,10 +18,25 @@ from config import (
     parse_args,
 )
 from convo_summary import summarize_convo_all
-from refine import refine_all
+from refine import is_blank_transcript, load_refined_ledger, refine_all
 from run_lock import exclusive_lock
 from text_inbox import process_inbox
 from transcribe import discover_audio_files, transcribe_all
+
+
+def split_finished(files, ledger):
+    """Split audio into (finished, pending).
+
+    Finished = transcript exists and is either blank (refine has nothing to do)
+    or listed in the refine ledger for that day. Pending stays in capture/ so a
+    leftover file there means something still needs a look.
+    """
+    done, pending = [], []
+    for af in files:
+        tp = af.transcript_path
+        finished = tp.exists() and (is_blank_transcript(tp) or tp.name in ledger.get(af.date, []))
+        (done if finished else pending).append(af)
+    return done, pending
 
 
 def archive_files(files, dry_run: bool = False) -> int:
@@ -207,15 +222,12 @@ def _run(args) -> int:
 
     # ── Step 3: Archive ──────────────────────────────────────────
     if args.step is None and not args.no_archive and audio_files:
-        # Only archive if both transcribe and refine succeeded (no failures)
-        if t_fail == 0 and r_fail == 0 and not args.dry_run:
-            print("\n[Step 3] Archiving processed audio files...")
-            archived = archive_files(audio_files)
-        elif args.dry_run:
-            print("\n[Step 3] Archive preview...")
-            archived = archive_files(audio_files, dry_run=True)
-        elif t_fail > 0 or r_fail > 0:
-            print("\n[Step 3] Skipping archive (there were failures)")
+        # Per file: archive what made it into the daily note, leave the rest in capture/
+        done, pending = split_finished(audio_files, load_refined_ledger())
+        print("\n[Step 3] " + ("Archive preview..." if args.dry_run else "Archiving processed audio files..."))
+        archived = archive_files(done, dry_run=args.dry_run)
+        for af in pending:
+            print(f"  Kept in capture/ (not finished): {af.path.name}")
 
     # ── Step 4: Cleanup old archives ─────────────────────────────
     if args.step is None:

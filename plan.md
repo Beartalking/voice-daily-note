@@ -22,6 +22,14 @@ content-publisher」。`share_to_social.py` 还在仓里但不要再跑。
 
 ## Completed
 
+### 逐个归档，漏下的留在 capture/（2026-10-08）
+- 起因：10-08 09:00 那次 10 段里第 1 段转写失败（Buzz 超时 → whisper 兜底时 ffmpeg 报 `Interrupted system call`），旧逻辑「有失败就整批不归档」把成功的 9 段也压在 `capture/` 里。手动重跑几秒就转好了，偶发
+- 改为**逐个判断**：`pipeline.split_finished()` 按「transcript 存在，且空白或已进 refine ledger 当天名单」算完成，完成的归档，其余原地留下并打印 `Kept in capture/ (not finished): <文件>`。Bear 定的口径：**打开 capture/ 看到的就是漏下的**。`refine.py` 补了 `load_refined_ledger()` / `is_blank_transcript()` 两个公开函数
+- 失败仍 exit 1、仍弹 Basso 通知，没变
+- 验证：新增 `test_archive_partial.py`（成功 / 转写失败 / 精修失败 / 空白 / ledger 日期不对 五种）；6 个旧测试无回归；`--dry-run` 跑通。capture 当时是空的，真实归档路径首次在 10-08 21:00 跑
+- **决定不改**（Bear 2026-10-08）：日志跑完才落盘（09:00 那次跑了 80 分钟，中途看着像没跑）、Buzz 超时后 CPU whisper 一段可拖半小时。理由：一天两次，偶尔看一眼不会漏
+- 顺带查清：10-07 晚上 20:30 / 21:00 没跑是因为晚间排程 21:45 才装上，不是故障
+
 ### 早晚各跑一次（2026-10-07）
 - Plaud **08:30 / 20:30**，capture **09:00 / 21:00**（两个 plist 的 `StartCalendarInterval` 改成数组）。晚上定 8 点多是 Bear 定的：那时电脑基本开着，有通知也不算太晚
 - **Plaud 截止规则改了**：原来是「今天以前」，晚上跑会把当天的全部压住，等于空跑；现在是「录完满 `PLAUD_MIN_AGE_HOURS`（2）小时」，结束时间 = `start_at` + `duration`（`1m51s` / `1h2m3s` 格式，解析不了按 0 算）。20:30 那次接住 18:30 以前录完的。代价：会议录完 2 小时内没在 App 里点转录，就会被当口述转录进日记

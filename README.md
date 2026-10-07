@@ -15,7 +15,7 @@ Recording/*.wav  →  transcripts/*.txt  →  output/YYYY-MM-DD.md  →  Obsidia
 
 1. **转写**：用 [Buzz](https://buzzcaptions.com/) 调用本地 Whisper 模型转文字，失败时自动 fallback 到 Python whisper 库
 2. **精修**：发送转写文本给 Claude API，修正错别字、补充分段、整理结构。零删减，原始信息全量保留
-3. **归档**：精修完成后将音频移入 `archive/YYYY-MM-DD/`
+3. **归档**：精修完成后将音频移入 `archive/YYYY-MM-DD/`（逐个判断；没转写成功或没进日记的留在 `capture/`）
 
 ### v1.3 — 社交帖子流水线
 
