@@ -1,11 +1,11 @@
 #!/bin/bash
-# launchd: com.bear.voice-capture — fired daily at 09:00.
+# launchd: com.bear.voice-capture — fired daily at 09:00 and 21:00.
 # Pipeline A: ~/Desktop/capture/ audio -> transcribe -> refine -> Obsidian Daily Notes
 # -> archive (also runs text inbox as Step 2.6). This is step 1 of /capture only;
 # voice-capture triage (step 2) needs Claude + the Reminders MCP and stays manual:
 # a later /capture finds no audio left and goes straight to triage.
-# 09:00 sits after Plaud sync (08:30, drops yesterday's dictation into capture/) and
-# before text inbox (09:30). Overlap with a manual /capture is safe: pipeline.py holds
+# Each run sits 30 min after a Plaud sync (08:30 / 20:30, drops dictation into
+# capture/). The 09:00 run sits before text inbox (09:30). Overlap with a manual /capture is safe: pipeline.py holds
 # .pipeline.lock and the loser prints [LOCKED] and exits 0.
 # Manual: bash run_capture.sh
 
@@ -42,7 +42,8 @@ ARCHIVED=$(echo "$OUT" | sed -n 's/.*Archived *: \([0-9][0-9]*\) files.*/\1/p' |
 
 if [ "$rc" -ne 0 ]; then
   notify "capture 有步骤失败 (exit $rc)，看 ~/Library/Logs/voice-daily-note/capture.log" "Voice Capture · 失败" "Basso"
-elif [ -n "$ARCHIVED" ]; then
+elif [ -n "$ARCHIVED" ] && [ "$(date +%H)" -lt 12 ]; then
+  # Evening run stays quiet on success; the morning one is the nudge to triage.
   notify "$ARCHIVED 段录音已写进日记，开会话跑 /capture 做分诊" "Voice Capture · 已转录" "Glass"
 fi
 if [ -n "$SKIPPED" ]; then

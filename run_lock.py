@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Shared run lock: one advisory flock per pipeline, so two runs never interleave.
 
-Used by pipeline A (pipeline.py, launchd 09:00 + manual /capture) and pipeline C
+Used by pipeline A (pipeline.py, launchd 09:00 / 21:00 + manual /capture) and pipeline C
 (text_inbox.py, launchd 09:30). Each guards its own ledger with its own lock file.
 
 flock is released by the kernel when the process exits, so a crashed or killed

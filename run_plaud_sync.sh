@@ -1,5 +1,5 @@
 #!/bin/bash
-# launchd: com.bear.voice-plaud-sync — fired daily at 08:30.
+# launchd: com.bear.voice-plaud-sync — fired daily at 08:30 and 20:30.
 # Plaud cloud -> capture/ (solo dictation, for pipeline A) or 23_Meetings/ (conversations).
 # Headless + idempotent (.plaud_sync_ledger.json dedups). Manual: bash run_plaud_sync.sh
 

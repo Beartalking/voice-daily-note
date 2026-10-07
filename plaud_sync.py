@@ -7,13 +7,14 @@
   has transcript -> conversation: transcript (speaker-labelled) + all summaries
                     as one note in 23_Meetings/, never transcribed locally
 
-Only recordings that started before today (local time) are touched, so there
-is time to trigger transcription in the Plaud app first.
+Only recordings that ended at least PLAUD_MIN_AGE_HOURS ago are touched, so
+there is time to trigger transcription in the Plaud app first. Runs at 08:30
+and 20:30, so the evening run picks up the day's recordings up to ~18:30.
 
 Usage:
     python3 plaud_sync.py              # process new recordings
     python3 plaud_sync.py --dry-run    # show routing, write nothing
-    python3 plaud_sync.py --id of_xxx  # one recording (ignores the day cutoff)
+    python3 plaud_sync.py --id of_xxx  # one recording (ignores the age cutoff)
     python3 plaud_sync.py --seed       # mark everything in Plaud as processed
 
 Exit codes: 0 ok, 1 some recordings failed, 2 Plaud login expired.
@@ -31,7 +32,7 @@ import sys
 import tempfile
 import urllib.request
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -39,6 +40,7 @@ from config import (
     PLAUD_LEDGER,
     PLAUD_LOCK,
     PLAUD_LOOKBACK_DAYS,
+    PLAUD_MIN_AGE_HOURS,
     PLAUD_MEETINGS_DIR,
     RECORDING_DIR,
 )
@@ -52,6 +54,8 @@ URL_RE = re.compile(r"https://\S+")
 # Untitled recordings are named after their own start time; no point repeating it.
 UNTITLED_RE = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$")
 UNSAFE_CHARS_RE = re.compile(r'[/\\:*?"<>|\n\r\t]+')
+# `plaud file` duration, e.g. "1m51s", "1h2m3s", "45s"
+DURATION_RE = re.compile(r"^(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+)s)?$")
 
 
 class AuthExpired(Exception):
@@ -117,7 +121,23 @@ def get_file(file_id):
             raise PlaudError("plaud file {}: missing '{}' in output".format(file_id, key))
     start_utc = datetime.fromisoformat(fields["start_at"]).replace(tzinfo=timezone.utc)
     fields["start_local"] = start_utc.astimezone()  # system zone (Pacific/Auckland)
+    fields["end_local"] = fields["start_local"] + parse_duration(fields.get("duration", ""))
     return fields
+
+
+def parse_duration(text):
+    # type: (str) -> timedelta
+    """'1h2m3s' -> timedelta. Missing or unparseable -> 0, i.e. age counts from start."""
+    m = DURATION_RE.match(text.strip())
+    if not text.strip() or not m:
+        return timedelta(0)
+    h, mi, se = (int(g) if g else 0 for g in m.groups())
+    return timedelta(hours=h, minutes=mi, seconds=se)
+
+
+def too_recent(rec, now):
+    # type: (dict, datetime) -> bool
+    return now - rec["end_local"] < timedelta(hours=PLAUD_MIN_AGE_HOURS)
 
 
 # ── naming ───────────────────────────────────────────────────────────
@@ -296,7 +316,7 @@ def seed(dry_run):
 def run(only_id=None, dry_run=False):
     # type: (Optional[str], bool) -> int
     ledger = _load_ledger()
-    today = datetime.now().astimezone().date()
+    now = datetime.now().astimezone()
     ids = [only_id] if only_id else list_recent_ids(PLAUD_LOOKBACK_DAYS)
     ok = skipped = failed = 0
 
@@ -305,8 +325,8 @@ def run(only_id=None, dry_run=False):
             continue
         try:
             rec = get_file(file_id)
-            if not only_id and rec["start_local"].date() >= today:
-                skipped += 1  # today's: leave time to transcribe in the app
+            if not only_id and too_recent(rec, now):
+                skipped += 1  # leave time to transcribe in the app
                 continue
             has_transcript = rec["transcript"] == "available"
             route = "meeting" if has_transcript else "audio"
@@ -330,7 +350,7 @@ def run(only_id=None, dry_run=False):
             failed += 1
             print("  [FAILED] {}: {}".format(file_id, e))
 
-    print("  Plaud sync: {} synced, {} today (held), {} failed".format(ok, skipped, failed))
+    print("  Plaud sync: {} synced, {} too recent (held), {} failed".format(ok, skipped, failed))
     return 1 if failed else 0
 
 
@@ -338,7 +358,7 @@ def main():
     # type: () -> int
     p = argparse.ArgumentParser(description="Sync Plaud recordings to capture / 23_Meetings")
     p.add_argument("--dry-run", action="store_true", help="show routing, write nothing")
-    p.add_argument("--id", help="process one recording (ignores the day cutoff)")
+    p.add_argument("--id", help="process one recording (ignores the age cutoff)")
     p.add_argument("--seed", action="store_true",
                    help="mark every recording in Plaud as processed")
     args = p.parse_args()

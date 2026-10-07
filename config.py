@@ -43,7 +43,7 @@ TEXT_INBOX_LEDGER = BASE_DIR / ".text_inbox_ledger.json"
 # this machine.
 TEXT_INBOX_LOCK = BASE_DIR / ".text_inbox.lock"
 
-# Pipeline A (audio) lock. launchd runs pipeline.py daily at 09:00 and Bear still
+# Pipeline A (audio) lock. launchd runs pipeline.py daily at 09:00 and 21:00 and Bear still
 # runs /capture by hand; both read and write .refined_ledger.json, so the two
 # must never interleave. Local disk, same reasoning as TEXT_INBOX_LOCK.
 PIPELINE_LOCK = BASE_DIR / ".pipeline.lock"
@@ -57,6 +57,9 @@ PLAUD_MEETINGS_DIR = Path(
 PLAUD_LEDGER = BASE_DIR / ".plaud_sync_ledger.json"
 PLAUD_LOCK = BASE_DIR / ".plaud_sync.lock"
 PLAUD_LOOKBACK_DAYS = 14  # covers days the Mac was off when launchd fired
+# A recording is held until it ended this long ago: time to tap "transcribe" in the
+# Plaud app for a conversation. Missed it -> it routes as dictation into the diary.
+PLAUD_MIN_AGE_HOURS = 2
 
 # ── Transcription ────────────────────────────────────────────────────
 BUZZ_CLI = "/Applications/Buzz.app/Contents/MacOS/Buzz"

@@ -132,7 +132,7 @@ def main() -> int:
         # the lock nor should be able to block the real run behind it.
         return _run(args)
 
-    # launchd (09:00) and a manual /capture both read and write the refined
+    # launchd (09:00 / 21:00) and a manual /capture both read and write the refined
     # ledger; serialise whole runs so the same transcript is never appended
     # to a daily note twice (the 2026-08-06 pipeline C incident, audio side).
     with exclusive_lock(PIPELINE_LOCK) as acquired:
