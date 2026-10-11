@@ -23,7 +23,7 @@ def write_daily_note(date, entry_count, text, append=False):
         date: ISO date string (YYYY-MM-DD)
         entry_count: number of entries (used in front matter for new files)
         text: formatted markdown text to write
-        append: if True and file exists, append with separator
+        append: kept for callers; an existing file is appended to either way
 
     Returns:
         Path to the written file
@@ -31,7 +31,11 @@ def write_daily_note(date, entry_count, text, append=False):
     output_path = get_daily_note_path(date)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if append and output_path.exists():
+    # Never overwrite an existing note, whatever the caller asked for. The file
+    # is shared: morning-pages and text_inbox write into it too. refine used to
+    # pass append=False for a date's first transcript (empty ledger) even when
+    # the note already existed, and wiped the Morning Pages block of 2026-10-04.
+    if output_path.exists():
         existing = output_path.read_text(encoding="utf-8")
         separator = "\n\n---\n\n"
         content = existing.rstrip() + separator + text

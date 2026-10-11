@@ -22,6 +22,14 @@ content-publisher」。`share_to_social.py` 还在仓里但不要再跑。
 
 ## Completed
 
+### 写日记不再覆盖已有笔记（2026-10-11）
+
+`refine.py` 的 `append_mode = output_path.exists() and bool(processed_files)`：某天第一条语音转写
+（ledger 里还没这天）遇上已存在的笔记，走新建分支整篇覆盖。2026-10-04 的笔记由 morning-pages 在
+4 Oct 建好，6 Oct 21:16 被 refine 覆盖，Morning Pages 区块整块消失（morning-pages 重跑已补回）。
+9/1、9/5 那两次漏落多半也是它。修在共享的 `daily_note_writer.write_daily_note`：文件存在就一律追加，
+`append` 参数保留但不再能触发覆盖。回归测试 `test_daily_note_no_clobber.py`（旧代码跑会失败）。
+
 ### 逐个归档，漏下的留在 capture/（2026-10-08）
 - 起因：10-08 09:00 那次 10 段里第 1 段转写失败（Buzz 超时 → whisper 兜底时 ffmpeg 报 `Interrupted system call`），旧逻辑「有失败就整批不归档」把成功的 9 段也压在 `capture/` 里。手动重跑几秒就转好了，偶发
 - 改为**逐个判断**：`pipeline.split_finished()` 按「transcript 存在，且空白或已进 refine ledger 当天名单」算完成，完成的归档，其余原地留下并打印 `Kept in capture/ (not finished): <文件>`。Bear 定的口径：**打开 capture/ 看到的就是漏下的**。`refine.py` 补了 `load_refined_ledger()` / `is_blank_transcript()` 两个公开函数
