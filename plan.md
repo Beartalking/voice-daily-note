@@ -254,7 +254,9 @@ B 之所以该搬是因为它跨出去了。**C 和 D 全程在 Bear Vault 内�
 
 - [ ] Post-refinement character count validation with auto-retry if content shrinks > 15%
 
-- [ ] iPhone Voice Memo `.m4a` filename pattern support（当前需手动重命名为 `YYYYMMDD-N.m4a` 格式）
+- [ ] iPhone Voice Memo `.m4a` filename pattern support（当前需手动重命名为 `YYYYMMDD-N.m4a` 格式）。2026-10-15 补充：Voice Memos 导出的 `Recording N.m4a` 被**静默跳过**（Step 1 只打一行 skipped），而且文件时间是导出时间，录制时间拿不到
+
+- [ ] **单日 refine 超 max_tokens 会卡死整天**（2026-10-15 发现）：10-13 NZVC 的 5 段长活动转录留在 `transcripts/`，当天 refine 输出超过 64000 tokens，连挂 4 次，把同一天 3 段正常的 Plaud 口述也压在 capture 里。当天处理：长活动录音改走 `23_Meetings/` 会议笔记，已处理的转录挪进 `transcripts/_routed_to_meetings/`（refine 不递归扫描），重跑后 13 号正常写入。代码未改；可选修法是 refine 按 token 预算分批，或超长单段直接拒收并提示改走会议笔记
 
 - [ ] **清死代码**（2026-08-24 开工检查发现）：`share_pipeline.py`（v1.2 的轻量版）和 `share_to_linkedin.py` 早在 v1.3 就被 `share_to_social.py` 取代，两个文件仍留在仓里；`README.md:147` 还把 `share_pipeline.py` 列为「从每日笔记存到 Content Vault（轻量版）」，会误导下一个来读的人（包括未来的 Claude）
 
