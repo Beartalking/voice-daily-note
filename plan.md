@@ -22,6 +22,21 @@ content-publisher」。`share_to_social.py` 还在仓里但不要再跑。
 
 ## Completed
 
+### 长录音本地转写进 23_Meetings，不再靠 Plaud 转录（2026-10-27）
+
+Bear 定：Plaud 免费版每月只有 300 分钟转录，不想再靠在 App 里点「转录」来分流对话。没点的长对话以前会被当口述
+扔进 capture/，日记 refine 超时把当天口述一起卡住（10-23 Bernadett 那次）。
+
+- `plaud_sync.choose_route()`：有 Plaud transcript → `meeting`（不变）；没有且时长 ≥ `PLAUD_LOCAL_MEETING_MINUTES`（10）→
+  `local-meeting`；其余 → `audio`（口述，不变）
+- `local-meeting`：音频下到 `archive/<日期>/`（随 7 天清理），whisper（`WHISPER_MODEL_SIZE`，`fp16=False`）按 segment 转成
+  `[h:mm:ss] 文本` 逐行，`build_meeting_note(..., local=True)` 写进 23_Meetings，`source: plaud-local-whisper`，摘要位写明「本地转写、
+  不分说话人、没有摘要」。下载逻辑抽成 `_download_m4a()`，口述路径共用
+- `run_plaud_sync.sh` 加 `caffeinate -i`，长转写时不睡眠
+- 验证：新增 `test_plaud_route.py`（路由边界 + 时间戳格式）；`test_plaud_age.py` 无回归；真实 whisper 跑 10-27 一段 2 分钟口述，
+  含模型加载 17 秒，推算 80 分钟约 6–8 分钟
+- 没解决：活动日被 Plaud 切成多段、每段不到 10 分钟的录音仍走口述路径（10-16 Hackathon 那种），看到 refine FAILED 仍按旧办法处理
+
 ### 写日记不再覆盖已有笔记（2026-10-11）
 
 `refine.py` 的 `append_mode = output_path.exists() and bool(processed_files)`：某天第一条语音转写

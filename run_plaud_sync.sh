@@ -17,7 +17,8 @@ cd "$PROJECT_DIR" || exit 1
 
 {
   echo "===== plaud_sync: $(date '+%Y-%m-%d %H:%M:%S %Z') ====="
-  "$PYTHON" plaud_sync.py
+  # caffeinate: a long recording is now transcribed here (whisper, can take tens of minutes).
+  caffeinate -i "$PYTHON" plaud_sync.py
   rc=$?
   echo "===== Exit code: $rc ====="
   echo

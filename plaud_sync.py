@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Plaud cloud -> local, split by whether Plaud has a transcript.
+"""Plaud cloud -> local, split by Plaud transcript and length.
 
-  no transcript  -> solo dictation: download audio, convert to m4a, drop into
-                    ~/Desktop/capture/ for pipeline A (run separately)
   has transcript -> conversation: transcript (speaker-labelled) + all summaries
                     as one note in 23_Meetings/, never transcribed locally
+  no transcript, >= PLAUD_LOCAL_MEETING_MINUTES
+                 -> conversation: transcribed here with whisper (timestamps, no
+                    speaker labels), one note in 23_Meetings/; audio kept in
+                    archive/<date>/ for the usual 7 days
+  no transcript, shorter
+                 -> solo dictation: download audio, convert to m4a, drop into
+                    ~/Desktop/capture/ for pipeline A (run separately)
 
 Only recordings that ended at least PLAUD_MIN_AGE_HOURS ago are touched, so
 there is time to trigger transcription in the Plaud app first. Runs at 08:30
@@ -37,12 +42,16 @@ from pathlib import Path
 from typing import Optional
 
 from config import (
+    ARCHIVE_DIR,
     PLAUD_LEDGER,
+    PLAUD_LOCAL_MEETING_MINUTES,
     PLAUD_LOCK,
     PLAUD_LOOKBACK_DAYS,
     PLAUD_MIN_AGE_HOURS,
     PLAUD_MEETINGS_DIR,
     RECORDING_DIR,
+    TRANSCRIBE_LANGUAGE,
+    WHISPER_MODEL_SIZE,
 )
 
 PLAUD_BIN = os.environ.get("PLAUD_BIN", "plaud")
@@ -140,6 +149,16 @@ def too_recent(rec, now):
     return now - rec["end_local"] < timedelta(hours=PLAUD_MIN_AGE_HOURS)
 
 
+def choose_route(rec):
+    # type: (dict) -> str
+    if rec["transcript"] == "available":
+        return "meeting"
+    length = rec["end_local"] - rec["start_local"]
+    if length >= timedelta(minutes=PLAUD_LOCAL_MEETING_MINUTES):
+        return "local-meeting"
+    return "audio"
+
+
 # ── naming ───────────────────────────────────────────────────────────
 
 def _clean_name(name, max_len=60):
@@ -181,12 +200,8 @@ def _unique(path):
 
 # ── routes ───────────────────────────────────────────────────────────
 
-def sync_audio(rec, dry_run):
-    # type: (dict, bool) -> Optional[Path]
-    dest = _unique(RECORDING_DIR / audio_filename(rec))
-    if dry_run:
-        print("    -> capture/{}".format(dest.name))
-        return None
+def _download_m4a(rec, dest):
+    # type: (dict, Path) -> None
     # The signed URL says "expires in 24 hours" but is signed for 3600s, so
     # fetch it immediately before downloading.
     m = URL_RE.search(_plaud("audio", rec["id"]))
@@ -196,21 +211,76 @@ def sync_audio(rec, dry_run):
         raw = Path(tmp) / "audio.ogg"
         with urllib.request.urlopen(m.group(0), timeout=300) as resp, raw.open("wb") as f:
             shutil.copyfileobj(resp, f)
-        # Plaud serves Ogg Opus; pipeline A only accepts wav/m4a/mp3.
+        # Plaud serves Ogg Opus; pipeline A and whisper want m4a.
         m4a = Path(tmp) / "audio.m4a"
         subprocess.run(
             ["afconvert", "-f", "m4af", "-d", "aac", str(raw), str(m4a)],
             check=True, capture_output=True,
         )
-        RECORDING_DIR.mkdir(parents=True, exist_ok=True)
+        dest.parent.mkdir(parents=True, exist_ok=True)
         # Move in whole, so pipeline A never sees a half-written file.
         shutil.move(str(m4a), str(dest))
+
+
+def sync_audio(rec, dry_run):
+    # type: (dict, bool) -> Optional[Path]
+    dest = _unique(RECORDING_DIR / audio_filename(rec))
+    if dry_run:
+        print("    -> capture/{}".format(dest.name))
+        return None
+    _download_m4a(rec, dest)
     print("    -> capture/{}".format(dest.name))
     return dest
 
 
-def build_meeting_note(rec, transcript, summary):
-    # type: (dict, str, str) -> str
+def _stamp(seconds):
+    # type: (float) -> str
+    s = int(seconds)
+    return "{:d}:{:02d}:{:02d}".format(s // 3600, s % 3600 // 60, s % 60)
+
+
+def format_segments(segments):
+    # type: (list) -> str
+    """whisper segments -> one '[h:mm:ss] text' line each, blanks dropped."""
+    lines = []
+    for seg in segments:
+        text = seg.get("text", "").strip()
+        if text:
+            lines.append("[{}] {}".format(_stamp(seg.get("start", 0)), text))
+    return "\n".join(lines)
+
+
+def transcribe_local(audio):
+    # type: (Path) -> str
+    import whisper  # heavy import, only when a long recording needs it
+    model = whisper.load_model(WHISPER_MODEL_SIZE)
+    result = model.transcribe(str(audio), language=TRANSCRIBE_LANGUAGE, fp16=False)
+    return format_segments(result.get("segments", []))
+
+
+def sync_local_meeting(rec, dry_run):
+    # type: (dict, bool) -> Optional[Path]
+    dest = _unique(PLAUD_MEETINGS_DIR / meeting_filename(rec))
+    if dry_run:
+        print("    -> 23_Meetings/{} (local whisper)".format(dest.name))
+        return None
+    # Kept beside pipeline A's archive so the 7-day cleanup removes it too.
+    audio = _unique(ARCHIVE_DIR / rec["start_local"].strftime("%Y-%m-%d") / audio_filename(rec))
+    _download_m4a(rec, audio)
+    print("    transcribing locally ({}, whisper {})...".format(
+        rec.get("duration", "?"), WHISPER_MODEL_SIZE), flush=True)
+    transcript = transcribe_local(audio)
+    if not transcript.strip():
+        raise PlaudError("local whisper {}: empty transcript".format(rec["id"]))
+    summary = ("（Plaud 上没有转录，本地 whisper 转写：带时间戳，不分说话人，没有摘要。"
+               "需要整理时在对话里过一遍。）")
+    dest.write_text(build_meeting_note(rec, transcript, summary, local=True), encoding="utf-8")
+    print("    -> 23_Meetings/{}".format(dest.name))
+    return dest
+
+
+def build_meeting_note(rec, transcript, summary, local=False):
+    # type: (dict, str, str, bool) -> str
     start = rec["start_local"]
     title = _clean_name(rec["name"], max_len=200) or start.strftime("%Y-%m-%d %H:%M 录音")
     lines = [
@@ -219,7 +289,7 @@ def build_meeting_note(rec, transcript, summary):
         "type: meeting",
         "project: ",
         "participants: []",
-        "source: plaud",
+        "source: {}".format("plaud-local-whisper" if local else "plaud"),
         "plaud_id: {}".format(rec["id"]),
         "start: {}".format(start.strftime("%Y-%m-%d %H:%M")),
         "duration: {}".format(rec.get("duration", "")),
@@ -228,7 +298,7 @@ def build_meeting_note(rec, transcript, summary):
         "",
         "# {}".format(title),
         "",
-        "## Plaud 摘要",
+        "## 摘要" if local else "## Plaud 摘要",
         "",
         summary.strip() or "（无摘要）",
         "",
@@ -328,12 +398,13 @@ def run(only_id=None, dry_run=False):
             if not only_id and too_recent(rec, now):
                 skipped += 1  # leave time to transcribe in the app
                 continue
-            has_transcript = rec["transcript"] == "available"
-            route = "meeting" if has_transcript else "audio"
+            route = choose_route(rec)
             print("  {}  {}  {}  [{}]".format(
                 file_id, rec["start_local"].strftime("%Y-%m-%d %H:%M"), rec["name"], route))
-            if has_transcript:
+            if route == "meeting":
                 dest = sync_meeting(rec, dry_run)
+            elif route == "local-meeting":
+                dest = sync_local_meeting(rec, dry_run)
             else:
                 dest = sync_audio(rec, dry_run)
             if not dry_run:

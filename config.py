@@ -58,8 +58,13 @@ PLAUD_LEDGER = BASE_DIR / ".plaud_sync_ledger.json"
 PLAUD_LOCK = BASE_DIR / ".plaud_sync.lock"
 PLAUD_LOOKBACK_DAYS = 14  # covers days the Mac was off when launchd fired
 # A recording is held until it ended this long ago: time to tap "transcribe" in the
-# Plaud app for a conversation. Missed it -> it routes as dictation into the diary.
+# Plaud app for a conversation. Optional since 2026-10-27, see the next setting.
 PLAUD_MIN_AGE_HOURS = 2
+# No Plaud transcript and at least this long -> a conversation transcribed locally
+# into 23_Meetings, not dictation. Bear 2026-10-27: Plaud's free plan has 300 min a
+# month, so don't rely on tapping "transcribe"; and a long conversation in the
+# diary path makes refine time out and stalls the whole day (10-23 Bernadett).
+PLAUD_LOCAL_MEETING_MINUTES = 10
 
 # ── Transcription ────────────────────────────────────────────────────
 BUZZ_CLI = "/Applications/Buzz.app/Contents/MacOS/Buzz"
